@@ -1,0 +1,2 @@
+# businessForecasting
+ This repository contains my lecture notes (PDFs generated from R Markdown) for our business forecasting class. The course is an introductory course on forecasting and time series analysis. The organization of the course is based on the Spring 2020 class taught by Dr. Allison Jones-Farmer. I did my best to add references whenver possible. If I missed a reference, please let me know.
