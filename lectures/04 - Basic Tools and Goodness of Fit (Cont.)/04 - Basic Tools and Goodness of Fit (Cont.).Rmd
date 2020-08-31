@@ -1,0 +1,475 @@
+---
+title: "ISA 444: Business Forecasting"
+subtitle: "04 - Basic Tools and Goodness of Fit (Cont.)"
+author: Fadel M. Megahed
+date: 'Fall 2020'
+output:
+  beamer_presentation:
+    number_sections: false
+    toc: false
+    slide_level: 3
+    includes: 
+      in_header: structure.txt
+classoption: "aspectratio=169"
+always_allow_html: yes
+bibliography: refs.bib
+link-citations: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE,
+                      verbose = FALSE,
+                      progress = FALSE,
+                      fig.align = "center",
+                      fig.pos = 'p',
+                      fig.width = 5.8,
+                      fig.height= 2.9,
+                      allowframebreaks = TRUE,
+                      fig.margin=TRUE,
+                      kable.force.latex = TRUE,
+                      cache = TRUE)
+options(kableExtra.latex.load_packages = FALSE)
+pacman::p_load(kableExtra, tidyverse, xtable)
+```
+
+# Preface
+
+
+### Quick Refresher based on Last Class
+
+\begin{block}{\textbf{Main Learning Outcomes}}
+   $\quad$ \textcolor{darkgreen}{\large \checkboxFadel} \textbf{Interpret seasonal plots.} \\
+	 $\quad$ \textcolor{miamired}{\large $\boxtimes$}		\textbf{Use numerical summaries to describe a time series.} \\
+	 $\quad$ \textcolor{miamired}{\large $\boxtimes$}	\textbf{Apply differencing to a time series.}
+\end{block}
+
+### Non-Graded Mentimeter Poll
+
+Given that we have spent the majority of last class on plotting, please go to \url{www.menti.com}, and answer the sliding scale questions, to assess your understanding of the material so far.
+
+### Recap: Seasonal Plots
+
+```{r seasonalPlot, echo=FALSE}
+if(require(pacman)==FALSE) install.packages("pacman")
+pacman::p_load(tidyverse, lubridate)
+retailSales = read.csv("https://fred.stlouisfed.org/graph/fredgraph.csv?bgcolor=%23e1e9f0&chart_type=line&drp=0&fo=open%20sans&graph_bgcolor=%23ffffff&height=450&mode=fred&recession_bars=on&txtcolor=%23444444&ts=12&tts=12&width=1168&nt=0&thu=0&trc=0&show_legend=yes&show_axis_titles=yes&show_tooltip=yes&id=RSCCASN&scale=left&cosd=1992-01-01&coed=2020-07-01&line_color=%234572a7&link_values=false&line_style=solid&mark_type=none&mw=3&lw=2&ost=-99999&oet=99999&mma=0&fml=a&fq=Monthly&fam=avg&fgst=lin&fgsnd=2020-02-01&line_index=1&transformation=lin&vintage_date=2020-08-23&revision_date=2020-08-23&nd=1992-01-01")
+retailSales$DATE = ymd(retailSales$DATE)
+retailSales$MONTH = month(retailSales$DATE)
+retailSales$YEAR = year(retailSales$DATE)
+
+retailSales %>% filter(YEAR >= 2014 & YEAR < 2020) %>% 
+  mutate(YEAR = as.factor(YEAR)) %>% 
+  ggplot(aes(x = MONTH, y = RSCCASN, color = YEAR, group = YEAR)) +
+  geom_line() +
+  labs(x = "Month", y = "Retail Sales (Monthly)", 
+       title = "A Seasonal Time Series Plot of Retail Sales",
+       caption = "Data from FRED") + theme_bw() +
+  scale_x_discrete(limits = factor(seq(1,12, 1)) ) +
+  scale_color_brewer(type = "seq", palette = "Blues")
+```
+
+### Recap: Scatterplot Matrix / Generalized Pairs Plots {.allowframebreaks}
+
+```{r scpMatrix}
+pacman::p_load(tidyverse, GGally, readxl)
+read_excel("Data/German_forecasts.xlsx") %>% 
+  ggpairs(columns = c('GDP', 'GFCF', 'Govsurp', 'Unemp')) + 
+  labs(title = "Matrix Plot of GDP, GFCF, Govsurp & Unemp",
+       caption = "Data from Muller-Droge et al. (2016)") + theme_bw()
+```
+
+### Learning Objectives for Today's Class
+
+\begin{block}{\textbf{Main Learning Outcomes}}
+  \begin{itemize}
+			\item \textbf{Use numerical summaries to describe a time series.} \\
+			\item \textbf{Apply transformations to a time series.}
+	\end{itemize}
+\end{block}
+
+# Summarizing the Data, Correlation & Transformations
+
+## Summarizing the Data
+
+### Measures of Average
+**Mean:** Given a set of $n$ values $Y_1, \, Y_2, \, \dots, \, Y_n$, the arithmetic mean can be computed as:
+
+\begin{equation}
+\bar{Y} = \frac{Y_1 + Y_2 + \dots + Y_n}{n} = \frac{1}{n}\sum_{i=1}^{i=n}Y_i.
+\end{equation}
+
+**Order Statistics:**
+Given a set of $n$ values $Y_1, \, Y_2, \, \dots, \, Y_n$, we place them in an ascending order to define the order statistics, written as $Y_{(1)}, \, Y_{(2)}, \, \dots, \, Y_{(n)}.$
+
+**Median:**  
+
+  - If $n$ is odd, $n = 2m + 1$ and the median is $Y_{(m+1)}$.   
+  - If $n$ is even, $n = 2m$ and the median is the average of the two middle numbers, i.e.,  $\frac{1}{2}[Y_{(m)} + Y_{(m+1)}]$.
+
+
+### Measures of Variation
+
+The **range** denotes the difference between the largest and smallest value in a sample:  
+\begin{equation}
+\text{Range} = Y_{(n)} - Y_{(1)}.
+\end{equation}
+
+The **deviation** is defined as the difference between a given observation $Y_i$ and the mean $\bar{Y}$.
+
+The **mean absolute deviation (MAD)** is the average deviations about the mean, irrespective of their sign:
+\begin{equation}
+\text{MAD} = \frac{\sum_{i=1}^{i=n}|d_i|}{n}.
+\end{equation}
+
+The **variance** is the average of the squared deviations around the mean:  
+\begin{equation}
+S^2 = \frac{\sum_{i=1}^{i=n}d_i^2}{n-1}.
+\end{equation}
+
+
+### Applications of Measures of Average/Variance: MAD Function {.allowframebreaks}
+
+- The `mad()` in R is used for computing the median absolute deviation and **Not** the mean absolute deviation. This can be easily checked using `?mad()` in your R console.  
+
+- Thus, we will have to create our custom R function, `MAD()`, which we will define as follows: 
+```{r MAD}
+MAD = function(x){
+  return( mean( abs(x-mean(x)) ) )
+  }
+```
+
+- Now, let us make sure that this formula works as expected by testing it on the vector `x = c(1, 2, 3)` and comparing it with manually computing the MAD.
+
+
+### Applications of Measures of Average/Variance: $^DJI {.allowframebreaks}
+- Let us examine the stock prices for the [Dow Jones Industrial Average Index](https://finance.yahoo.com/quote/%5EDJI/) from March 23, 2020 up to and including August 21, 2020. 
+
+- Let us compute the aforementioned measures, on the adjusted closing price, using the following two approaches: (a) averages **across** all months, and (b) averages **by/within** month. The printout for those two methods are shown in the tables below.
+
+```{r dji, echo= FALSE, results='asis'}
+if(require(pacman)==FALSE) install.packages("pacman")
+pacman::p_load(tidyquant, lubridate, magrittr)
+dowJonesIndex = tq_get("^DJI", from = "2020-03-23", to = "2020-08-22") %>% 
+  select(symbol, date, adjusted)
+dowJonesIndex$month = month(dowJonesIndex$date)
+dowJonesIndex %>% summarise(meanACP = mean(adjusted),
+                            medianACP = median(adjusted),
+                            madACP = MAD(adjusted),
+                            varACP = var(adjusted),
+                            sdACP = sd(adjusted) ) -> djiSummary
+
+print(xtable(djiSummary, align = c(rep('c', 6))), comment = FALSE, size = '\\scriptsize', include.rownames=FALSE)
+
+dowJonesIndex$month %>% factor(labels = c('March','April','May','June', 'July', 'August')) -> dowJonesIndex$month
+dowJonesIndex %>% group_by(month) %>% summarise(meanACP = mean(adjusted),
+                            medianACP = median(adjusted),
+                            madACP = MAD(adjusted),
+                            varACP = var(adjusted),
+                            sdACP = sd(adjusted) ) -> djiSummary
+
+print(xtable(djiSummary, align = c(rep('c', 7))), comment = FALSE, size = '\\scriptsize', include.rownames=FALSE)
+```
+
+## Correlation
+
+### The Pearson Correlation Coefficient
+
+- **Correlation:** measures the strength of the **linear relationship** between two
+quantitative variables.
+
+- It can be computed using the `cor()` from base R. Mathematically speaking, the pearson correlation coefficient, $r$, can be computed as
+
+\begin{equation}
+  r = \frac{\sum_{i=1}^{n} (X_i - \bar{X})(Y_i - \bar{Y})}{\sqrt{\sum_{i=1}^{n}(X_i - \bar{X})^2 \sum_{i=1}^{n}(Y_i - \bar{Y})^2}}
+\end{equation}
+
+
+- Do **not** use the Pearson Correlation coefficient if both variables are not quantitative. Instead, refer to the `mixed.cor()` from the [psch package](https://personality-project.org/r/psych/help/mixed.cor.html) to compute the correlations for mixtures of continuous, polytomous, and/or dichotomous variables.
+
+- You should supplement any descriptive summaries with visualizations to ensure that you are able to interpret the computations correctly.
+
+
+### A Synthetic Example: The Anscombe Dataset [1]
+
+**In a seminal paper, Anscombe stated:**\footnotemark  *Few of us escape being indoctrinated with these notions* 
+
+- *numerical calculations are exact, but graphs are rough;*  
+- *for any particular kind of statistical data there is just one set of calculations constituting a correct statistical analysis;*  
+- *performing intricate calculations is virtuous, whereas actually looking at the data is cheating.*
+
+**He proceeded by stating that** *a computer should make both calculations and graphs. Both sorts of output should be studied; each will contribute to understanding.*  
+
+**Now, let us consider his four datasets, each consisting of eleven (x,y) pairs.**
+
+\footnotetext{Anscombe, Francis J. 1973. ``Graphs in Statistical Analysis." \textit{The American Statistician} 27 (1): 17–21. (\href{https://www.sjsu.edu/faculty/gerstman/StatPrimer/anscombe1973.pdf}{Click here to access the full paper}).}
+
+### A Synthetic Example: The Anscombe Dataset [2]
+```{r anscombe2, echo=FALSE, results="asis"}
+print(xtable(anscombe, align = c(rep('r', 9))), comment = FALSE, size = '\\scriptsize', include.rownames=FALSE)
+```
+
+### A Synthetic Example: The Anscombe Dataset [3]
+```{r anscombe3, echo = FALSE, results='asis'}
+pacman::p_load(Tmisc) # same data but in 3 columns
+df = quartet %>% group_by(set) %>% 
+  summarise(x.mean = mean(x), x.sd = sd(x),
+            y.mean = mean(y), y.sd = sd(y),
+            corr = cor(x, y))
+print(xtable(df, align = c(rep('c', 7))), comment = FALSE, size = '\\scriptsize', include.rownames=FALSE)
+```
+
+
+### A Synthetic Example: The Anscombe Dataset [4]
+```{r anscombe4, results='asis', echo=FALSE}
+ggplot(quartet, aes(x, y)) + geom_point() + 
+  geom_smooth(method = lm, se = FALSE) + facet_wrap(~set) + theme_bw()
+```
+
+
+### Anscombe-Like Mistakes in Research and Practice
+In my estimation, Figure 8c represents an example where regression should not have been performed\footnotemark. 
+
+\vspace{-\baselineskip}
+
+\centering \href{https://www.jneurosci.org/content/32/11/3791/tab-figures-data}{\includegraphics[width=\textwidth, height=0.6\textheight, keepaspectratio,frame]{Figures/F8Large.jpg}}
+
+\footnotetext{Cai, Xinying, and Camillo Padoa-Schioppa. 2012. ``Neuronal Encoding of Subjective Value in Dorsal and Ventral Anterior Cingulate Cortex.'' \textit{Journal of Neuroscience} 32(11):3791–3808.}
+
+
+## Transformations
+
+### First Differences {.allowframebreaks}
+
+The change in the time series from one period to the next is known as the (first) difference. It can be computed as follows:
+\begin{equation}
+DY_t = Y_t - Y_{t-1}
+\end{equation}
+
+```{r djIndexDiff}
+dowJonesIndex = tq_get("^DJI", from = "2020-08-17", to = "2020-08-22") %>% 
+  select(symbol, date, adjusted)
+dowJonesIndex$`Yt-1` = lag(dowJonesIndex$adjusted)
+dowJonesIndex$DYt = dowJonesIndex$adjusted - dowJonesIndex$`Yt-1`
+```
+
+```{r djIndexDiff2, results="asis", echo=FALSE}
+dowJonesIndex$date = as.character(dowJonesIndex$date)
+print(xtable(dowJonesIndex, align = c(rep('c', 6))), comment = FALSE, size = '\\scriptsize', include.rownames=FALSE) 
+```
+
+Note that the differences can be computed in one step using the function `diff()` from base R as follows.
+
+```{r djIndexDiff3}
+dowJonesIndex = tq_get("^DJI", from = "2020-08-17", to = "2020-08-22") %>% 
+  select(symbol, date, adjusted)
+dowJonesIndex$DYt = c(NA, diff(dowJonesIndex$adjusted))
+```
+
+```{r djIndexDiff4, echo=FALSE, results="asis"}
+dowJonesIndex$date = as.character(dowJonesIndex$date)
+print(xtable(dowJonesIndex, align = c(rep('c', 5))), comment = FALSE, size = '\\scriptsize', include.rownames=FALSE)
+
+```
+
+### Differencing for Seasonal Data {.allowframebreaks}
+
+Recall the plot of the [Advance Retail Sales: Clothing and Clothing Accessory Stores (RSCCASN) FRED dataset](https://fred.stlouisfed.org/series/RSCCASN).
+
+```{r fred}
+pacman::p_load(tidyquant)
+retailSales = tq_get("RSCCASN", get = "economic.data",
+                     from = "2015-01-01", to = "2019-12-31")
+retailSales$month = month(retailSales$date)
+retailSales$year = year(retailSales$date) %>% factor()
+retailSales %>% 
+  ggplot(aes(x = month, y = price, color = year)) + geom_line() +
+  labs(title = "How would you difference based on that plot?",
+       x = "Month", y = "Sales in Millions of Dollars",
+       caption = "Data from FRED, extracted using the tidyquant package") +
+  scale_x_discrete() + scale_color_brewer(type = "qual") + theme_bw()
+```
+
+### Differencing with Seasonal Data [3]
+
+**The table below is the result of Approach #1 in R**
+
+```{r fred2, results="asis", echo=FALSE}
+retailSales$`Yt-m` = lag(retailSales$price, 12)
+retailSales$`DYt-m` = retailSales$price - retailSales$`Yt-m`
+df = retailSales %>% select(-c(month, year, symbol)) %>% 
+  mutate(date = as.character(date))
+print(xtable(df[1:18,], align = c(rep('c', 5))), comment = FALSE, size = '\\scriptsize', include.rownames=FALSE)
+```
+
+### Differencing with Seasonal Data [4]
+
+**The table below is the result of Approach #2 in R**
+
+```{r fred3, echo=FALSE, results="asis"}
+pacman::p_load(magrittr)
+df %<>% select(-c(`Yt-m`, `DYt-m`))
+df$`DYt-m` = c(rep(NA,12), diff(df$price, 12))
+print(xtable(df[1:18,], align = c(rep('c', 4))), comment = FALSE, size = '\\scriptsize', include.rownames=FALSE)
+```
+
+
+### Growth Rates: The Formulation
+
+In the absence of seasonality, the growth rate for a time series is given by
+\begin{equation}
+  GY_t = 100 \frac{Y_t - Y_{t-1}}{Y_{t-1}}
+\end{equation}
+
+In the presence of seasonality (with period $= m$), the growth rate for a time series is given by
+\begin{equation}
+  GY_t = 100 \frac{Y_t - Y_{t-m}}{Y_{t-m}}
+\end{equation}
+
+
+### Growth Rates in Practice -- a Non-Graded Class Activity
+
+- **Question:** Has anyone in this class bought any cryptocurrencies?  
+
+- **Follow up question:** Hypothetically speaking let us say that Fadel has purchased \$10 worth of [Stellar ($XLM)](https://coinmarketcap.com/all/views/all/). Each \$XLM coin was worth $0.1$ on 08-25-2020.  
+  - Let us say that Fadel was lucky and his investment went up 20\% on 08-26-2020, i.e. $GY_t = 20$. Using the formula, compute the value of each coin on 08-26-2020. 
+
+  - Due to the volatility of cryptocurrencies, let us assume that Fadel's growth rate for the following day was -20% (i.e., in comparison with the coin's value on 08-26-2020). Compute the value of the coin on 08-27-2020.
+
+  - Provide the answer to both computational questions on [Canvas](https://miamioh.instructure.com/courses/123532/quizzes/321556).
+
+
+### The Log Transform [1]
+
+The log transformation can be computed as follows:
+\begin{equation}
+  L_t = \ln{(Y_t)}
+\end{equation}
+Note that the `log()` in R takes the natural logarithm as its default base, i.e., would transform a variable/statistic based on the above equation.
+
+The reverse transformation using the exponential function is:
+\begin{equation}
+  e^{L_t} = e^{\ln{(Y_t})} = Y_t
+\end{equation}
+
+The first difference in logarithms represents the logarithm of the ratio:
+\begin{equation}
+  L_t = \ln{(\frac{Y_t}{Y_{t-1}})} = \ln{(Y_t)} - \ln{(Y_{t-1})}
+\end{equation}
+
+
+### The Log Transform [2]
+
+- The primary purpose of the log transform is to **convert exponential growth into linear growth.**
+
+- The transform often has the **secondary purpose of balancing the variance.**  
+
+- Difference in logs and growth rate transformations produce similar results and interpretations.
+
+
+### Plots with and without the Log Transformation [1]
+
+```{r gdpPlot1, echo=FALSE}
+gdp = read.csv("https://fred.stlouisfed.org/graph/fredgraph.csv?bgcolor=%23e1e9f0&chart_type=line&drp=0&fo=open%20sans&graph_bgcolor=%23ffffff&height=450&mode=fred&recession_bars=on&txtcolor=%23444444&ts=12&tts=12&width=1168&nt=0&thu=0&trc=0&show_legend=yes&show_axis_titles=yes&show_tooltip=yes&id=GDP&scale=left&cosd=1947-01-01&coed=2020-04-01&line_color=%234572a7&link_values=false&line_style=solid&mark_type=none&mw=3&lw=2&ost=-99999&oet=99999&mma=0&fml=a&fq=Quarterly&fam=avg&fgst=lin&fgsnd=2020-02-01&line_index=1&transformation=lin&vintage_date=2020-08-26&revision_date=2020-08-26&nd=1947-01-01")
+gdp$DATE = ymd(gdp$DATE)
+
+gdp %>% 
+  ggplot(aes(x = DATE, y = GDP)) + 
+  geom_line() +
+  labs(title = "GDP without Log Transformation",
+       x = "Date", y = "GDP",
+       caption = "Data from FRED") +
+  scale_x_date() + theme_bw()
+```
+
+### Plots with and without the Log Transformation [2]
+
+```{r gdpPlot2, echo=FALSE}
+gdp$GDP = log(gdp$GDP)
+gdp %>% 
+  ggplot(aes(x = DATE, y = GDP)) + 
+  geom_line() +
+  labs(title = "GDP with Log Transformation",
+       x = "Date", y = "Ln(GDP)",
+       caption = "Data from FRED") +
+  scale_x_date() + theme_bw() + ylim(c(5,10))
+```
+
+### Plots with and without the Log Transformation [3]
+
+```{r gdpPlot3, echo=FALSE}
+gdp = read.csv("https://fred.stlouisfed.org/graph/fredgraph.csv?bgcolor=%23e1e9f0&chart_type=line&drp=0&fo=open%20sans&graph_bgcolor=%23ffffff&height=450&mode=fred&recession_bars=on&txtcolor=%23444444&ts=12&tts=12&width=1168&nt=0&thu=0&trc=0&show_legend=yes&show_axis_titles=yes&show_tooltip=yes&id=GDP&scale=left&cosd=1947-01-01&coed=2020-04-01&line_color=%234572a7&link_values=false&line_style=solid&mark_type=none&mw=3&lw=2&ost=-99999&oet=99999&mma=0&fml=a&fq=Quarterly&fam=avg&fgst=lin&fgsnd=2020-02-01&line_index=1&transformation=lin&vintage_date=2020-08-26&revision_date=2020-08-26&nd=1947-01-01")
+gdp$DATE = ymd(gdp$DATE)
+gdp$GDP = log(gdp$GDP)
+gdp$GDP = c(rep(NA, 4), diff(gdp$GDP, 4))
+gdp %>% na.omit() %>% 
+  ggplot(aes(x = DATE, y = GDP)) + 
+  geom_line() +
+  labs(title = "Differences, with lag = 4, of the Log GDP",
+       x = "Date", y = "DL(GDP)",
+       caption = "Data from FRED") +
+  scale_x_date() + theme_bw()
+```
+
+# Recap
+
+### Summary of Main Points
+
+\begin{block}{\textbf{Main Learning Outcomes}}
+  \begin{itemize}
+			\item \textbf{Interpret seasonal plots.} \\
+			\item \textbf{Use numerical summaries to describe a time series.} \\
+			\item \textbf{Apply transformations to a time series.}
+	\end{itemize}
+\end{block}
+
+
+### Things to Do
+
+ - Thoroughly read Chapter 2 of our book. We covered up to the end of Section 2.6, p. 43).  
+ 
+ - Go through the slides, examples and make sure you have a good understanding of what we have covered. 
+ 
+ - Complete the graded assignment for more details.
+ 
+ - If you are interested in additional practice problems, please consider the following problems from your textbook. To access these datasets,please click [here](https://www.wessexlearning.org/pobf2e/index.html).
+   - Exercise 2.4  
+   - Exercise 2.7
+   - Exercise 2.10 
+   
+### Graded Assignment 03: Evaluating your Retention/Focus
+
+Please go to \href{https://miamioh.instructure.com/courses/123532/quizzes/321128}{Canvas (click here)} and answer the questions. **Due August 31, 2020 [2:50 PM,
+Ohio local time].** 
+
+**What/Why/Prep?** The purpose of this assignment is to evaluate your understanding and retention of the material covered up to the end of Class 04. In order to prepare for this, you should have either actively attended class and/or watched the recording from WebEx. Furthermore, you should have thoroughly read up to the end of Section 2.6 from your textbook.
+
+**General Guidelines:**  
+
+\vspace{-0.5\baselineskip}
+
+  - Individual assignment.  
+  - This is **NOT** a timed assignment (i.e. once you start the assignment you will have 25 minutes to complete 4 questions). If the concepts we covered are well-understood, this should take $\le 10$ minutes. 
+  - Proctorio is NOT required for this assignment.  
+  - You will need to have R installed (or accessible through the \href{https://virtualpc.fsb.miamioh.edu/RDWeb/Pages/en-US/default.aspx}{Remote Desktop})
+  
+  
+### Graded Assignment 04: Evaluating your Retention/Focus
+Please go to \href{https://miamioh.instructure.com/courses/123532/quizzes/321567}{Canvas (click here)} and answer the questions. **Due August 31, 2020 [2:50 PM,
+Ohio local time].** 
+
+**What/Why/Prep?** The purpose of this assignment is to evaluate your understanding and retention of the material covered up to the end of Class 04. In order to prepare for this, you should have either actively attended class and/or watched the recording from WebEx. Furthermore, you should have thoroughly read up to the end of Section 2.6 from your textbook.
+
+**General Guidelines:**  
+
+\vspace{-0.5\baselineskip}
+
+  - Individual assignment.  
+  - This is **NOT** a timed assignment (i.e. once you start the assignment you will have 10-15 minutes to complete the one question).  
+  - Proctorio is NOT required for this assignment.  
+  - You will need to have R installed (or accessible through the \href{https://virtualpc.fsb.miamioh.edu/RDWeb/Pages/en-US/default.aspx}{Remote Desktop})
+
+---
+
+\maketitle
