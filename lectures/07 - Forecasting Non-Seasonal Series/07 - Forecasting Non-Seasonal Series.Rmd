@@ -250,7 +250,7 @@ ggplot(usdEURO, aes(x = date)) +
   
   
 ### Graded Assignment 06: Evaluating your Retention/Focus
-Please go to \href{https://miamioh.instructure.com/courses/123532/quizzes/322517}{Canvas (click here)} and answer the two questions. **Due Sept. 14, 2020 [2:50 PM,
+Please go to \href{https://miamioh.instructure.com/courses/123532/quizzes/324283}{Canvas (click here)} and answer the question. **Due Sept. 14, 2020 [2:50 PM,
 Ohio local time].** 
 
 **What/Why/Prep?** The purpose of this assignment is to evaluate your understanding and retention of the material covered up to the end of Class 05. In order to prepare for this, you should have either actively attended class and/or watched the recording from WebEx. Furthermore, you should have thoroughly read up to the end of Chapter 2 from your textbook.
@@ -265,12 +265,17 @@ Ohio local time].**
   - You will need to have R installed (or accessible through the \href{https://virtualpc.fsb.miamioh.edu/RDWeb/Pages/en-US/default.aspx}{Remote Desktop})
 
 
-```{r electricity, echo=FALSE, eval=FALSE}
-pacman::p_load(readxl, tidyverse)
-download.file("https://www.wessexlearning.org/pobf2e/dsa/Electricity.xlsx",
-              destfile = "Data/Electricity.xlsx", mode = "wb")
+```{r cpi, echo=FALSE, eval=FALSE}
+pacman::p_load(readxl, tidyverse, magrittr, fpp2)
+download.file("https://www.wessexlearning.org/pobf2e/dsa/CPI_change_2.xlsx",
+              destfile = "Data/CPI_change_2.xlsx", mode = "wb")
 
-upperPI = 740 + qnorm((1 - 0.9)/2)*318.3
+cpi = readxl::read_excel("Data/CPI_change_2.xlsx") %>% select(c(1,2))
+cpi$observation_date %<>% ymd()
+cpi %<>% filter(observation_date >= "2001-01-01")
+cpi %<>% mutate(ma3 = rollmean(INFLATION, 3, align = "right", fill = NA))
+cpi %<>% mutate(ma3 = lag(ma3)) 
+accuracy(cpi$ma3, cpi$INFLATION)
 ```
 
 ---
