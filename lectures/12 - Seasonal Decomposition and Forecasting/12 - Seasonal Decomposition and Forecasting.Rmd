@@ -1,0 +1,350 @@
+---
+title: "ISA 444: Business Forecasting"
+subtitle: "12 - Seasonal Decomposition and Forecasting"
+author: Fadel M. Megahed
+date: 'Fall 2020'
+output:
+  beamer_presentation:
+    number_sections: false
+    toc: false
+    slide_level: 3
+    includes: 
+      in_header: structure.txt
+classoption: "aspectratio=169"
+always_allow_html: yes
+bibliography: refs.bib
+link-citations: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE,
+                      verbose = FALSE,
+                      progress = FALSE,
+                      fig.align = "center",
+                      fig.pos = 'p',
+                      fig.width = 5.8,
+                      fig.height= 2.9,
+                      allowframebreaks = TRUE,
+                      fig.margin=TRUE,
+                      kable.force.latex = TRUE,
+                      cache = TRUE)
+options(kableExtra.latex.load_packages = FALSE)
+pacman::p_load(kableExtra, tidyverse, tidyquant, xtable, magrittr, fpp2)
+```
+
+# Preface
+
+
+### Quick Refresher on Chapter 04 so Far
+
+\begin{block}{\textbf{Main Learning Outcomes Discussed in Previous Chapter}}
+		$\quad$ \textcolor{darkgreen}{\large \checkboxFadel} \textbf{Explain when to use an additive vs. multiplicative model for a time series.} \\
+			$\quad$ \textcolor{miamired}{\large $\boxtimes$} \textbf{Use classic decomposition methods to detrend and deseasonalize a time series.}
+\end{block}
+
+
+### Learning Objectives for Today's Class
+\begin{block}{\textbf{Main Learning Outcomes}}
+  \begin{itemize}
+			\item \textbf{Use classic decomposition methods to detrend and deseasonalize a time series.}
+			\item \textbf{Use Holt-Winters method to forecast a time series with a seasonal component.}
+			\item \textbf{Evaluate the application of different smoothing methods applied to a time series, and determine the best performing method.}
+	\end{itemize}
+\end{block}
+
+
+# Decomposition Methods
+
+### Background: Centered Moving Averages
+
+Calculate the CMA(3), where you center the moving average in the middle of the moving window.
+
+```{r bikeSalesTable, echo=FALSE, results='asis'}
+bike = readxl::read_excel("Data/11 - BikeSalesR.xlsx")
+bike$MA3 = '----'
+print(xtable(bike, align = c(rep('c', 4)) ), comment = FALSE, size = '\\scriptsize', 
+      include.rownames=FALSE)
+
+#Solution can be obtained using:
+bike$MA3 = rollmean(bike$`Bike Sales`, k = 3, na.pad = TRUE, align = 'center') # from the zoo package
+```
+
+\textbf{\textcolor{miamired}{Question:} How do we handle the case when k is even??}
+
+
+### Decomposition Methods
+
+- Decomposition methods are used to “decompose” a time series into its components.  
+- Decomposition methods are generally poor forecasting methods, but they work well for:  
+
+  - exploring and visualizing time series data  
+  - detrending and/or deseasonalizing data  
+
+- Decomposition methods may be applied to multiplicative or additive time series.
+
+
+
+### Pure Decomposition Process for an Additive Time Series
+
+  - **Estimate the trend** by calculating the centered moving average for a window of width $K$, denoted as CMA($K$). Note you will lose $(K-1)/2$ observations at the beginning and end of the series if $K$ is odd;  suppose $K=3$, so we lose one observation at the beginning and the end.  
+  
+  - **Detrend the series** by subtracting the CMA from the corresponding observations.  
+  
+  - **Estimate the initial seasonal factors** by calculating the average value of the detrended series for each quarter, month, day, etc. (depending on the season length).  
+  
+  - **Standardize the seasonal factors** by computing their averages and then setting the final seasonal factor for each season equal to the initial value minus the overall average.  
+  
+  - **Estimate the error term** by subtracting seasonal factor from the detrended series for each corresponding season.
+
+
+### A Non-Graded Class Activity: Decomposing the 11-BikeSalesR.xlsx
+
+Based on the procedure described above, please use Excel to perform the aforementioned five steps.
+
+
+### A Live Demo of Using R as an alternative
+
+In class, we will use R to decompose the series and obtain the following plot
+
+```{r bikeDecomposed, echo=FALSE, fig.height=2.4}
+bike = bike %>% select(-c(MA3))
+fit = ts(bike$`Bike Sales`, frequency = 4) %>% decompose()
+autoplot(fit) + theme_bw(base_size = 7)
+```
+
+### Notes on the `decompose()` in R
+
+  - The `decompose()` function in R uses a slightly different algorithm than your textbook presents.\footnotemark  
+  
+  - The MA used to compute the trend estimate is a $2 \times m$ moving average. This means that for quarterly data, a $2 \times 4$ moving average is computed. First a MA(4) is computed, then a MA(2) of the MA(4) is computed. This is used to estimate the trend.  
+  
+  - The seasonal components are computed as usual and centered.
+  
+\footnotetext{Slide is from \href{https://miamioh.edu/fsb/directory/?up=/directory/farmerl2}{Dr. Allison Jones-Farmer's} lecture notes, Miami University, Spring 2020.}
+  
+
+### Pure Decomposition Process for a Multiplicative Model:
+
+  - **Estimate the trend** by calculating the centered moving average for a window of width $K$ (i.e., CMA(K)).  For now, let us assume that $k=3$.
+  
+  - **Detrend the series** dividing the observations $2,..,(n-1)$ from the their corresponding CMA(3).  
+  
+  - **Estimate the initial seasonal factors** by calculating the average value of the detrended series for each quarter, month, day, etc. (depending on the season length).  
+  
+  - **Standardize the seasonal factor** by computing their averages and then setting the final seasonal factor for each season equal to the
+initial value divided by the overall average.  
+
+  - **Estimate the error term** by dividing the detrended series by the seasonal factor for each corresponding season.
+
+
+### Limitations to Decomposition
+
+  - Decomposition is widely used in practice but is not a good forecasting method.  
+
+  - Decomposition methods are useful for visualizing your data and exploratory data analysis.  
+
+  - Trend estimates are from moving averages and are not available for the first few and last few observations.  
+
+  - Decomposition methods assume that the seasonal factors occur regularly from season to season over every period. This may not be true over the long run.  
+
+  - Decomposition methods are not robust to unusual or spurious patterns that may occur in the data.  
+
+Because of these limitations, we need a better forecasting method for seasonal data!\footnotemark
+
+\footnotetext{Slide is from \href{https://miamioh.edu/fsb/directory/?up=/directory/farmerl2}{Dr. Allison Jones-Farmer's} lecture notes, Miami University, Spring 2020.}
+
+
+
+
+# Holt Winters Seasonal Smoothing/Forecasting Methods
+
+### Definition and Basic Principles
+
+
+If a time series has a linear trend with a local trend ( $\beta_1$ ,growth rate) and a local seasonal pattern ($SN_t$) that may be changing over time, we can use the Holt-Winters exponential smoothing method for forecasting to accommodate the seasonal pattern.
+
+
+The Holt-Winters method accommodates time series data with a **local level**, a **local trend**, and a **local seasonal pattern**, all of which are slowly changing over time. There are both additive and multiplicative versions of the Holt-Winters method.
+
+
+### Additive Holt-Winters Smoothing Method {.allowframebreaks}
+
+
+To compute the FORECAST, we will use three smoothing constants, $\alpha$ , to smooth the level, $\beta$ , the smoothing constant to smooth the trend, and $\gamma$ to smooth the seasonal pattern of length/frequency $m$ (e.g. day-of-the-week pattern, $m=7$; quarterly pattern, $m = 4$; monthly pattern, $m = 12$).
+
+The estimate of the **level** is: 
+\begin{equation}
+l_t = \alpha (y_t \mathcolor{miamired}{- sn_{t-L}}) + (1-\alpha)[l_{t-1} + b_{t-1}]
+\end{equation}
+
+The estimate of the **trend** is:
+\begin{equation}
+b_t = \beta [l_t - l_{t-1}] + (1-\beta) b_{t-1}
+\end{equation}
+
+The estimate of the **seasonal pattern** is:
+\begin{equation}
+\mathcolor{miamired}{sn_t = \gamma [y_t - l_{t}] + (1-\gamma) sn_{t-L} }
+\end{equation}
+
+
+To estimate the **point forecast** for time $t+h$ time periods ahead made in time $t$:
+\begin{equation}
+\hat{y}_{t+h}(t) = l_t + h \times b_t \mathcolor{miamired}{+ sn_{t+h-L}}
+\end{equation}
+where $sn_{t+h-L}$ is the most recent estimate of the seasonal pattern for the season corresponding to the time period $t+h$.
+
+
+
+### Comments on the Use of Software for Holt-Winters Method
+
+- **Starting values:** We will need three sets of starting values; one for the Level, one for the Trend, and a set for $m$ Seasonal Components. There are no two statistical packages that compute starting values in the same way! *Therefore, be comfortable on the fact that there will be some slight differences in the error values when compared to your textbook.*
+
+- As we have done throughout the semester, we will be using R. The function used is titled `hw()`, which gets loaded from the [forecast package](https://cran.r-project.org/web/packages/forecast/forecast.pdf) (which we load when we run the command `pacman::p_load(fpp2)`).
+
+- Details on the method used to compute starting values in the `hw()` function can be found in the Rstudio documentation by typing `?forecast::hw()` at the command prompt.
+
+
+### Live Demo: Holt Winters (Additive) on the BikeSales Data
+
+```{r hwBikeAdd, echo=FALSE}
+pacman::p_load(tidyverse, magrittr, fpp2, readxl)
+bikeSales = read_excel('Data/11 - BikeSalesR.xlsx')
+
+hwin = hw(ts(bikeSales$`Bike Sales`, frequency = 4), alpha=.2, beta=.1, gamma=.1, seasonal="additive")
+autoplot(hwin) + theme_bw() + labs(x = 'Year', y = 'Bike Sales')
+```
+
+
+### Multiplicative Holt-Winters Smoothing Method {.allowframebreaks}
+
+
+To compute the FORECAST, we will use three smoothing constants, $\alpha$ , to smooth the level, $\beta$ , the smoothing constant to smooth the trend, and $\gamma$ to smooth the seasonal pattern of length/frequency $m$ (e.g. day-of-the-week pattern, $m=7$; quarterly pattern, $m = 4$; monthly pattern, $m = 12$).
+
+The estimate of the **level** is: 
+\begin{equation}
+l_t = \alpha (y_t \mathcolor{miamired}{/ sn_{t-L}}) + (1-\alpha)[l_{t-1} + b_{t-1}]
+\end{equation}
+
+The estimate of the **trend** is:
+\begin{equation}
+b_t = \beta [l_t - l_{t-1}] + (1-\beta) b_{t-1}
+\end{equation}
+
+The estimate of the **seasonal pattern** is:
+\begin{equation}
+\mathcolor{miamired}{sn_t = \gamma [y_t / l_{t}] + (1-\gamma) sn_{t-L} }
+\end{equation}
+
+
+To estimate the **point forecast** for time $t+h$ time periods ahead made in time $t$:
+\begin{equation}
+\hat{y}_{t+h}(t) = (l_t + h \times b_t) \mathcolor{miamired}{\times sn_{t+h-L}}
+\end{equation}
+where $sn_{t+h-L}$ is the most recent estimate of the seasonal pattern for the season corresponding to the time period $t+h$.
+
+
+### Live Demo: Holt Winters (Multiplicative) on BikeSales
+
+```{r hwBikeMulti, echo=FALSE}
+pacman::p_load(tidyverse, magrittr, fpp2, readxl)
+bikeSales = read_excel('Data/11 - BikeSalesR.xlsx')
+
+hwinmult = hw(ts(bikeSales$`Bike Sales`, frequency = 4), alpha=.2, beta=.1, gamma=.1, seasonal="multiplicative")
+autoplot(hwinmult) + theme_bw() + labs(x = 'Year', y = 'Bike Sales')
+```
+
+
+### Live Demo: Accuracy Comparison
+
+```{r hwBikeComparison, echo=FALSE, results='asis'}
+acc = rbind(accuracy(hwin), accuracy(hwinmult)) %>% round(digits = 3)
+row.names(acc) = c('Additive HW', 'Multiplicative HW')
+
+print(xtable(acc, align = c(rep('c', 8)) ), comment = FALSE, size = '\\scriptsize')
+```
+
+
+
+# Recap
+
+### Summary of Main Points
+
+\begin{block}{\textbf{Main Learning Outcomes}}
+  \begin{itemize}
+			\item \textbf{Use classic decomposition methods to detrend and deseasonalize a time series.}
+			\item \textbf{Use Holt-Winters method to forecast a time series with a seasonal component.}
+			\item \textbf{Evaluate the application of different smoothing methods applied to a time series, and determine the best performing method.}
+	\end{itemize}
+\end{block}
+
+
+
+### Things to Do for Next Class
+
+ - Thoroughly read Chapter 4.1-4.4 and 4.6-4.7 of our textbook.
+ 
+ - Go through the slides, examples and make sure you have a good understanding of what we have covered. 
+   
+  - Complete the practice assignment (see details in next slide).
+
+
+### Practice/Non-Graded Assignment {.allowframebreaks}
+
+Use the file ['12-Job_openings.xlsx'](https://miamioh.instructure.com/courses/123532/files/17413757?module_item_id=2594974) for this exercise.
+
+  1.	Convert the data to an appropriate time series and plot the series over time.  
+
+  2.	Use simple additive decomposition visualize the series (see the `type` argument in `decompose()`).  Plot the decomposition.   Print the seasonal factors.  What are the units of the seasonal factors?  
+
+  3.	Repeat with multiplicative decomposition (see the `type` argument in `decompose()`).  Plot the decomposition.   Print the seasonal factors.  What are the units of the seasonal factors?  
+
+  4.	Split the series into a training sample (2001-2014) and a validation sample (2015).  
+
+  5.	Use Linear Exponential Smoothing (holt’s method) to fit an optimal  model to the training sample, forecasting for the next 12 periods.  Plot the series, forecast, and retrospective fitted values.  
+
+  6.	Use Holt-Winters Smoothing to fit an optimal model to the training sample, forecasting for the next 12 periods.  Plot the series, forecast, and retrospective fitted values.  
+
+  7.	Assuming you need to forecast with a horizon of 12 months, compare the validation sample accuracy of Holt’s method to Holt Winters on the 2015 data only.
+
+
+
+```{r assignment, echo=FALSE, eval=FALSE}
+pacman::p_load(readxl, tidyverse, magrittr, fpp2)
+
+job=read_excel("Data/12 - Job_openings.xlsx")
+
+job=ts(job$`Job Openings`,start=c(2001,1),frequency=12)
+plot(job,type="o")
+
+dec=decompose(job,type="additive")
+plot(dec)
+dec2=decompose(job,type="multiplicative")
+plot(dec2)
+
+train=window(job,end=c(2014,12))
+valid=window(job,start=c(2015,1))
+
+fit_h=holt(train,h=12)
+summary(fit_h)
+plot(fit_h)
+lines(fit_h$fitted,col="blue")
+lines(valid,col="black")
+tab=accuracy(fit_h,valid)
+
+
+fit_hw=hw(train)
+summary(fit_hw)
+lines(fit_hw$fitted,col="red")
+lines(fit_hw$mean,col="red")
+tab=rbind(tab,accuracy(fit_hw,valid))
+rownames(tab)=c("holt-train","holt-test","hw-train","hw-test")
+print(tab)
+
+```
+
+---
+
+\maketitle

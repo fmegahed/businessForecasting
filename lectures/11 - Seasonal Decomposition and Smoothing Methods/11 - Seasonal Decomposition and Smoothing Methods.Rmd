@@ -1,0 +1,302 @@
+---
+title: "ISA 444: Business Forecasting"
+subtitle: "11 - Seasonal Decomposition and Smoothing Methods"
+author: Fadel M. Megahed
+date: 'Fall 2020'
+output:
+  beamer_presentation:
+    number_sections: false
+    toc: false
+    slide_level: 3
+    includes: 
+      in_header: structure.txt
+classoption: "aspectratio=169"
+always_allow_html: yes
+bibliography: refs.bib
+link-citations: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE,
+                      verbose = FALSE,
+                      progress = FALSE,
+                      fig.align = "center",
+                      fig.pos = 'p',
+                      fig.width = 5.8,
+                      fig.height= 2.9,
+                      allowframebreaks = TRUE,
+                      fig.margin=TRUE,
+                      kable.force.latex = TRUE,
+                      cache = TRUE)
+options(kableExtra.latex.load_packages = FALSE)
+pacman::p_load(kableExtra, tidyverse, tidyquant, xtable, magrittr, fpp2)
+```
+
+# Preface
+
+
+### Quick Refresher on Chapter 03 so Far
+
+\begin{block}{\textbf{Main Learning Outcomes Discussed in Previous Chapter}}
+		$\quad$ \textcolor{darkgreen}{\large \checkboxFadel} \textbf{Explain the difference between causal and extrapolative forecasting.} \\
+		$\quad$ \textcolor{darkgreen}{\large \checkboxFadel} \textbf{Describe and apply forecasting with a cumulative average.} \\
+		$\quad$ \textcolor{darkgreen}{\large \checkboxFadel} \textbf{Describe and apply forecasting with a moving average.} \\
+		$\quad$ \textcolor{darkgreen}{\large \checkboxFadel} \textbf{Recognize time series that are appropriate for simple exponential smoothing (SES).} \\
+		$\quad$ \textcolor{darkgreen}{\large \checkboxFadel}\textbf{Use SES to forecast future observations of a time series.} \\
+		$\quad$ \textcolor{darkgreen}{\large \checkboxFadel}\textbf{Be able to develop an optimal forecast based on a training sample.} \\
+		$\quad$ \textcolor{darkgreen}{\large \checkboxFadel}\textbf{Be able to evaluate the out-of-sample performance of a forecast based on a hold-out (validation) sample.} \\
+		$\quad$ \textcolor{darkgreen}{\large \checkboxFadel}\textbf{Recognize time series that are appropriate for linear exponential smoothing (LES).} \\
+			$\quad$ \textcolor{darkgreen}{\large \checkboxFadel} \textbf{Use LES to forecast future observations of a time series.}
+\end{block}
+
+
+### Learning Objectives for Today's Class
+\begin{block}{\textbf{Main Learning Outcomes}}
+  \begin{itemize}
+			\item \textbf{Explain when to use an additive vs. multiplicative model for a time series.}
+			\item \textbf{Use classic decomposition methods to detrend and deseasonalize a time series.}
+	\end{itemize}
+\end{block}
+
+
+# Exam 1 Review
+
+### Live Walk-Through During Class
+
+We will walk through the exam during class. Please feel free to ask me any questions as we are going through the exam solutions.
+
+
+# Time Series Components
+
+### Definition and Basic Principles [1]
+
+A time series may be made up of:  
+
+- **Trends (T)** - upward and downward movements  
+- **Seasonal (S) components** - regular, recurrent patterns that repeat at a fixed known duration (period)  
+- **Error (E) components** - irregular “noise” that is randomly distributed over time\footnotemark
+
+
+\footnotetext{A time series may also contain a cyclical component if it displays a somewhat periodic fluctuation, but the fluctuation has a periodicity of unknown duration, usually longer than a year.}
+
+
+### Definition and Basic Principles [2]
+
+```{r decompose, echo=FALSE}
+pacman::p_load(tidyverse, magrittr, fpp2)
+df = co2
+decomposed = decompose(df)
+autoplot(decomposed) + theme_bw(base_size = 10) + labs(title = NULL, caption = 'Based on C02 data in base R')
+```
+
+
+### Recall: Additive vs. Multiplicative Models [1]
+
+An additive model is written as $Y = T + S + E$. 
+
+**Definition:** *An additive model is appropriate when the trend is approximately linear, and the seasonal components stays constant over time.*
+
+```{r addPlot, fig.height=2, echo=FALSE}
+pacman::p_load(lubridate)
+retail = read.csv("https://fred.stlouisfed.org/graph/fredgraph.csv?bgcolor=%23e1e9f0&chart_type=line&drp=0&fo=open%20sans&graph_bgcolor=%23ffffff&height=450&mode=fred&recession_bars=on&txtcolor=%23444444&ts=12&tts=12&width=1168&nt=0&thu=0&trc=0&show_legend=yes&show_axis_titles=yes&show_tooltip=yes&id=RSXFSN&scale=left&cosd=2011-01-01&coed=2019-12-01&line_color=%234572a7&link_values=false&line_style=solid&mark_type=none&mw=3&lw=2&ost=-99999&oet=99999&mma=0&fml=a&fq=Monthly&fam=avg&fgst=lin&fgsnd=2020-02-01&line_index=1&transformation=lin&vintage_date=2020-09-28&revision_date=2020-09-28&nd=1992-01-01")
+retail %>% ggplot(aes(x = ymd(DATE), y = RSXFSN)) +
+  geom_line() + 
+  labs(x=NULL,
+       title = "Seasonality with an Additive Trend", 
+       subtitle = "Retail (- Food Services) from 2011-01-01 to 2019-12-01",
+       caption = 'Data from FRED') +
+  theme_bw(base_size = 7)
+```
+
+
+### Recall: Additive vs. Multiplicative Models [2]
+
+A fully multiplicative model is written as Y = TSE.
+
+**Definition:** *It is appropriate when the rate of change in the trend and/or the seasonal component and/or the variability in the error term increase or decrease over time.*
+
+```{r airpassengers, echo=FALSE, fig.height=2}
+pacman::p_load(ggfortify)
+data("AirPassengers")
+autoplot(AirPassengers) + 
+  labs(x=NULL, title = "Seasonality with a Multiplicative Trend: Non-linear trend & seasonal component grows over time",
+       caption = 'AirPassengers R Dataset -- Source: Box, G. E. P., Jenkins, G. M. and Reinsel, G. C. (1976) Time Series Analysis, Forecasting and Control.') +
+  theme_bw(base_size = 7)
+```
+
+
+### Some Comments
+
+- When the trend and seasonal component are multiplied together, larger levels in the series will tend to exhibit larger peaks and troughs. When the error term is also multiplicative, the magnitude of the forecast errors will tend to rise and fall with the level of the series.\footnotemark
+
+- If the error variability is relatively constant over time, but the trend and/or seasonal components increase/decrease over time, a **mixed
+additive/multiplicative model**, $Y = TS + E$, may be more appropriate.  
+
+- An alternative to using a purely multiplicative model is to first transform the data using a logarithmic transformation.
+$$
+\begin{split}
+Y & = TSE \\
+\ln{(Y)} & = \ln{(TSE)} \\
+ & = \ln{(T)} + \ln{(S)} + \ln{(E)}
+\end{split}
+$$
+
+\footnotetext{Slide is from \href{https://miamioh.edu/fsb/directory/?up=/directory/farmerl2}{Dr. Allison Jones-Farmer's} lecture notes, Miami University, Spring 2020.}
+
+
+
+# Decomposition Methods
+
+### Background: Centered Moving Averages
+
+Calculate the CMA(3), where you center the moving average in the middle of the moving window.
+
+```{r bikeSalesTable, echo=FALSE, results='asis'}
+bike = readxl::read_excel("Data/11 - BikeSalesR.xlsx")
+bike$MA3 = '----'
+print(xtable(bike, align = c(rep('c', 4)) ), comment = FALSE, size = '\\scriptsize', 
+      include.rownames=FALSE)
+
+#Solution can be obtained using:
+bike$MA3 = rollmean(bike$`Bike Sales`, k = 3, na.pad = TRUE, align = 'center') # from the zoo package
+```
+
+\textbf{\textcolor{miamired}{Question:} How do we handle the case when k is even??}
+
+
+### Decomposition Methods
+
+Decomposition methods are used to “decompose” a time series into its components. Decomposition methods are generally poor forecasting methods, but they work well for:  
+
+  - exploring and visualizing time series data  
+  - detrending and/or deseasonalizing data  
+
+Decomposition methods may be applied to multiplicative or additive time series.
+
+
+
+### Pure Decomposition Process for an Additive Time Series
+
+  - **Estimate the trend** by calculating the centered moving average for a window of width $K$, denoted as CMA($K$). Note you will lose $(K-1)/2$ observations at the beginning and end of the series if $K$ is odd;  suppose $K=3$, so we lose one observation at the beginning and the end.  
+  
+  - **Detrend the series** by subtracting the CMA from the corresponding observations.  
+  
+  - **Estimate the initial seasonal factors** by calculating the average value of the detrended series for each quarter, month, day, etc. (depending on the season length).  
+  
+  - **Standardize the seasonal factors** by computing their averages and then setting the final seasonal factor for each season equal to the initial value minus the overall average.  
+  
+  - **Estimate the error term** by subtracting seasonal factor from the detrended series for each corresponding season.
+
+
+### A Non-Graded Class Activity: Decomposing the 11-BikeSalesR.xlsx
+
+Based on the procedure described above, please use Excel to perform the aforementioned five steps.
+
+
+### A Live Demo of Using R as an alternative
+
+In class, we will use R to decompose the series and obtain the following plot
+
+```{r bikeDecomposed, echo=FALSE, fig.height=2.4}
+bike = bike %>% select(-c(MA3))
+fit = ts(bike$`Bike Sales`, frequency = 4) %>% decompose()
+autoplot(fit) + theme_bw(base_size = 7)
+```
+
+### Notes on the `decompose()` in R
+
+  - The `decompose()` function in R uses a slightly different algorithm than your textbook presents.\footnotemark  
+  
+  - The MA used to compute the trend estimate is a $2 \times m$ moving average. This means that for quarterly data, a $2 \times 4$ moving average is computed. First a MA(4) is computed, then a MA(2) of the MA(4) is computed. This is used to estimate the trend.  
+  
+  - The seasonal components are computed as usual and centered.
+  
+\footnotetext{Slide is from \href{https://miamioh.edu/fsb/directory/?up=/directory/farmerl2}{Dr. Allison Jones-Farmer's} lecture notes, Miami University, Spring 2020.}
+  
+
+### Pure Decomposition Process for a Multiplicative Model:
+
+  - **Estimate the trend** by calculating the centered moving average for a window of width $K$ (i.e., CMA(K)).  For now, let us assume that $k=3$.
+  
+  - **Detrend the series** dividing the observations $2,..,(n-1)$ from the their corresponding CMA(3).  
+  
+  - **Estimate the initial seasonal factors** by calculating the average value of the detrended series for each quarter, month, day, etc. (depending on the season length).  
+  
+  - **Standardize the seasonal factor** by computing their averages and then setting the final seasonal factor for each season equal to the
+initial value divided by the overall average.  
+
+  - **Estimate the error term** by dividing the detrended series by the seasonal factor for each corresponding season.
+
+
+### Limitations to Decomposition
+
+  - Decomposition is widely used in practice but is not a good forecasting method.  
+
+  - Decomposition methods are useful for visualizing your data and exploratory data analysis.  
+
+  - Trend estimates are from moving averages and are not available for the first few and last few observations.  
+
+  - Decomposition methods assume that the seasonal factors occur regularly from season to season over every period. This may not be true over the long run.  
+
+  - Decomposition methods are not robust to unusual or spurious patterns that may occur in the data.  
+
+Because of these limitations, we need a better forecasting method for seasonal data!\footnotemark
+
+\footnotetext{Slide is from \href{https://miamioh.edu/fsb/directory/?up=/directory/farmerl2}{Dr. Allison Jones-Farmer's} lecture notes, Miami University, Spring 2020.}
+
+
+# Recap
+
+### Summary of Main Points
+
+\begin{block}{\textbf{Main Learning Outcomes}}
+  \begin{itemize}
+			\item \textbf{Explain when to use an additive vs. multiplicative model for a time series.}
+			\item \textbf{Use classic decomposition methods to detrend and deseasonalize a time series.}
+	\end{itemize}
+\end{block}
+
+
+
+### Things to Do for Next Class
+
+ - Thoroughly read Chapter 4.1-4.4 of our textbook.
+ 
+ - Go through the slides, examples and make sure you have a good understanding of what we have covered. 
+   
+  - Complete the graded assignment (see details in next slide).
+
+
+### Graded Assignment 10: Evaluating your Retention/Focus
+Please go to \href{https://miamioh.instructure.com/courses/123532/quizzes/327666}{Canvas (click here)} and answer the question. **Due Oct. 1, 2020 [11:59 PM, Ohio local time].** 
+
+**What/Why/Prep?** The purpose of this assignment is to evaluate your understanding and retention of the material covered up to the end of Class 11. In order to prepare for this, you should have either actively attended class and/or watched the recording from WebEx. Furthermore, you should have thoroughly read up to the end of Chapter 4.4 from your textbook.
+
+**General Guidelines:**  
+
+\vspace{-0.5\baselineskip}
+
+  - Individual assignment.  
+  - This is **NOT** a timed assignment.  
+  - Proctorio is NOT required for this assignment.  
+  - You will need to have R installed (or accessible through the \href{https://virtualpc.fsb.miamioh.edu/RDWeb/Pages/en-US/default.aspx}{Remote Desktop})
+
+
+```{r assignment, echo=FALSE, eval=FALSE}
+pacman::p_load(readxl, tidyverse, magrittr)
+
+walmart = read_excel("Data/Walmart_2.xlsx") %>% select(c(6,7,8))
+colnames(walmart) = c('Year', 'Quarter', 'Sales')
+
+walmart$Year %<>% as.factor() 
+walmart$Quarter %<>% as.factor() 
+
+walmart %>% ggplot(aes(x = Quarter, y = Sales, group = Year, color = Year)) + 
+  geom_line() + geom_point() + theme_bw()
+```
+
+---
+
+\maketitle
