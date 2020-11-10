@@ -1,0 +1,232 @@
+---
+title: "ISA 444: Business Forecasting"
+subtitle: "18 - ARMA Models"
+author: Fadel M. Megahed
+date: 'Fall 2020'
+output:
+  beamer_presentation:
+    number_sections: false
+    toc: false
+    slide_level: 3
+    includes: 
+      in_header: structure.txt
+classoption: "aspectratio=169"
+always_allow_html: yes
+bibliography: refs.bib
+link-citations: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE,
+                      verbose = FALSE,
+                      progress = FALSE,
+                      fig.align = "center",
+                      fig.pos = 'p',
+                      fig.width = 5.8,
+                      fig.height= 2.9,
+                      allowframebreaks = TRUE,
+                      fig.margin=TRUE,
+                      kable.force.latex = TRUE,
+                      cache = TRUE)
+options(kableExtra.latex.load_packages = FALSE)
+pacman::p_load(kableExtra, tidyverse, tidyquant, xtable, magrittr, fpp2, ggpubr)
+```
+
+# Preface
+
+### Recap of What we Have Covered Last Class [1]
+
+**ARMA Models:** Models we considered may have two components, an autoregressive component (AR) and a moving average component (MA).
+
+\begin{block}{\textbf{Main Learning Outcomes from Last Class}}
+  \begin{itemize}
+      \item \textbf{Describe the behavior of the ACF and PACF of an AR(p) process.}
+			\item \textbf{Describe the behavior of the ACF and PACF of an MA(q) process.}
+	\end{itemize}
+\end{block}
+
+
+### Recap of What we Have Covered Last Class [2]
+\begin{table}
+  \centering
+  \begin{tabular}{c P{2in} P{2in}}
+\hline \hline
+    \textbf{Model} & \textbf{ACF} & \textbf{PACF} \\ \hline
+    AR(p) & Exponentially decays or damped sinusoidal pattern & Cuts off after lag $p$ \\ \hline
+    MA(q) & Cuts off after lag $q$ & Exponentially decays or damped sinusoidal pattern \\ \hline \hline
+  \end{tabular}
+\end{table}
+
+
+### Non-Graded Class Activity [15 minutes]
+
+For the file titled: [18 - inclass ARMA Practice.csv](https://miamioh.instructure.com/courses/123532/files/17704227?module_item_id=2619166), please identify: (a) whether Series 1-6 can be modeled using an AR or MA model, and (b) the corresponding order for such a model.
+
+
+### Learning Outcomes for Today's Class
+\begin{block}{\textbf{Main Learning Outcomes}}
+  \begin{itemize}
+      \item \textbf{Describe the behavior of the ACF and PACF of an ARMA (p,q) process.}
+			\item \textbf{Fit an ARMA model to a time series, evaluate the residuals of a fitted ARMA model to assess goodness of fit, use the Ljung-Box test for correlation among the residuals of an ARIMA model.}
+	\end{itemize}
+\end{block}
+
+
+
+# ARMA Models
+
+
+### Mixed Autoregressive Moving Average Processes {.allowframebreaks}
+Sometimes, if a really high order seems needed for an AR process, it may be better, instead, to add one or more MA term. This results in a mixed autoregressive moving average or an ARMA model.
+
+**In general, an ARMA(p,q) model is given as**
+\begin{equation*}
+  y_t = \color{miamired}{\delta + \phi_1 y_{t-1} + \phi_2 y_{t-2} + \dots + \phi_p y_{t-p}} \color{blue}{+ \epsilon_t - \theta_1 \epsilon_{t-1}  - \dots - \theta_q\epsilon_{t-q} }
+\end{equation*}
+
+The ACF and PACF of the ARMA(p,q) process exhibit exponential decay exponential decay and/or damped sinusoid patterns. This makes
+identification of the order of the ARMA(p,q) process difficult.
+
+\begin{table}
+  \centering
+  \begin{tabular}{c P{2in} P{2in}}
+\hline \hline
+    \textbf{Model} & \textbf{ACF} & \textbf{PACF} \\ \hline
+    AR(p) & Exponentially decays or damped sinusoidal pattern & Cuts off after lag $p$ \\ \hline
+    MA(q) & Cuts off after lag $q$ & Exponentially decays or damped sinusoidal pattern \\ \hline 
+    ARMA(p,q) & Exponentially decays or damped sinusoidal pattern & Exponentially decays or damped sinusoidal pattern \\ \hline \hline
+  \end{tabular}
+\end{table}
+
+
+
+
+### Example Plot of an ARMA(1,1): AR=.6, MA=.8 [1]
+```{r arma1sim1, echo=FALSE}
+ar.sim1 = arima.sim(model=list(ar=c(.6),ma=c(0.8)),n=500)
+
+ar.sim1 %>% autoplot() + theme_bw() +labs(y = 'ARMA')
+```
+
+### Example Plot of an ARMA(1,1): AR=.6, MA=.8 [2]
+```{r arma1sim2, echo=FALSE}
+acf(ar.sim1, plot = FALSE, lag.max = 25) %>% 
+  autoplot() + theme_bw() + labs(title = NULL)
+```
+
+### Example Plot of an ARMA(1,1): AR=.6, MA=.8 [3]
+```{r arma1sim3, echo=FALSE}
+pacf(ar.sim1, plot = FALSE, lag.max = 25) %>% 
+  autoplot() + theme_bw() + labs(title = NULL)
+```
+
+### Example Plot of an ARMA(1,1): AR=.6, MA=.8 [4]
+```{r arma1sim4, echo=FALSE}
+p1 = ar.sim1 %>% autoplot() + theme_bw() +labs(y = 'ARMA')
+p2 = acf(ar.sim1, plot = FALSE, lag.max = 25) %>% 
+  autoplot() + theme_bw() + labs(title = NULL)
+p3 = pacf(ar.sim1, plot = FALSE, lag.max = 25) %>% 
+  autoplot() + theme_bw() + labs(title = NULL)
+
+ggarrange(p1, p2, p3, ncol = 1, 
+          labels = c('ARMA(1,1): AR=.6, MA=.8', '', ''), nrow = 3) 
+```
+
+
+### Example Plots of an ARMA(1,1): AR=-.7, MA=-.6 [1]
+```{r arma2sim1, echo=FALSE}
+ar.sim2 = arima.sim(model=list(ar=c(-0.7),ma=c(-0.6)),n=500)
+
+ar.sim2 %>% autoplot() + theme_bw() +labs(y = 'ARMA')
+```
+
+
+### Example Plots of an ARMA(1,1): AR=-.7, MA=-.6 [2]
+```{r arma2sim2, echo=FALSE}
+acf(ar.sim2, plot = FALSE, lag.max = 25) %>% 
+  autoplot() + theme_bw() + labs(title = NULL)
+```
+
+
+### Example Plots of an ARMA(1,1): AR=-.7, MA=-.6 [3]
+```{r arma2sim3, echo=FALSE}
+pacf(ar.sim2, plot = FALSE, lag.max = 25) %>% 
+  autoplot() + theme_bw() + labs(title = NULL)
+```
+
+
+### Example Plots of an ARMA(1,1): AR=-.7, MA=-.6 [4]
+```{r arma2sim4, echo=FALSE}
+p1 = ar.sim2 %>% autoplot() + theme_bw() +labs(y = 'ARMA')
+p2 = acf(ar.sim2, plot = FALSE, lag.max = 25) %>% 
+  autoplot() + theme_bw() + labs(title = NULL)
+p3 = pacf(ar.sim2, plot = FALSE, lag.max = 25) %>% 
+  autoplot() + theme_bw() + labs(title = NULL)
+
+ggarrange(p1, p2, p3, ncol = 1, 
+          labels = c('ARMA(1,1): AR=-.7, MA=-.6', '', ''), nrow = 3) 
+```
+
+
+
+# How to Fit an AR, MA, or ARMA Model
+
+### The 5-Step Procedure {.allowframebreaks}
+
+  1. Plot the data over time.  
+  
+  2. Do the data seem stationary? If necessary, conduct a test for stationarity.  
+  
+  3. Once you can assume stationarity, find the ACF plot.  
+    a. If the ACF plot cuts off, fit an MA($q$), where $q=$ the cutoff point.  
+    b. If the ACF plot dies down, find the PACF plot.  
+      i. If the PACF plot cuts off, fit an AR($p$) model, where $p=$ the cutoff point.
+      ii. If the PACF plot dies down, fit an ARMA ($p,q$) model.  
+        You must iterate through $p$ and $q$ using a guess and check method starting with ARMA(1,1) models -- increment each by  1.
+  
+  4. Evaluate the model residuals and consider the ACF and PACF of the residuals.  
+  
+  5. If model fit is good, forecast future values.
+
+
+**Note:** 
+
+  - Often you will fit multiple models in Step 3 and compare models in Step 4 to select the best fit.
+
+
+
+### Live Demo
+
+Viscosity of a fluid is a measure that corresponds to “thickness”. For example, honey has a higher viscosity than water. A chemical company needs precise forecasts of the viscosity of a product in order to control product quality. Using the [18 - viscosity.csv](https://miamioh.instructure.com/courses/123532/files/17704503?module_item_id=2619236), we have 95 daily readings to use to develop a forecast. **In order to develop a forecast, let us first figure out what type of ARMA(p, q) model to fit and then develop the forecast.**
+
+# Recap
+
+### Summary Table
+\begin{table}
+  \centering
+  \begin{tabular}{c P{2in} P{2in}}
+\hline \hline
+    \textbf{Model} & \textbf{ACF} & \textbf{PACF} \\ \hline
+    AR(p) & Exponentially decays or damped sinusoidal pattern & Cuts off after lag $p$ \\ \hline
+    MA(q) & Cuts off after lag $q$ & Exponentially decays or damped sinusoidal pattern \\ \hline 
+    ARMA(p,q) & Exponentially decays or damped sinusoidal pattern & Exponentially decays or damped sinusoidal pattern \\ \hline \hline
+  \end{tabular}
+\end{table}
+
+
+
+### Things to Do to Prepare for Next Class
+
+ - Thoroughly read Chapters 6.2.1 - 6.2.4 of our textbook.
+ 
+ - Go through the slides, examples and make sure you have a good understanding of what we have covered.  
+ 
+ - **Practice:** For the file titled: [18 - inclass ARMA Practice.csv](https://miamioh.instructure.com/courses/123532/files/17704227?module_item_id=2619166), please identify: (a) whether Series 1-10, fit the appropriate ARMA(p, q) model and use the `checkresiduals()` to ensure that your residuals are uncorrelated.
+ 
+
+
+---
+
+\maketitle

@@ -1,0 +1,168 @@
+---
+title: "ISA 444: Business Forecasting"
+subtitle: "21 - ARIMA Models (Cont.)"
+author: Fadel M. Megahed
+date: 'Fall 2020'
+output:
+  beamer_presentation:
+    number_sections: false
+    toc: false
+    slide_level: 3
+    includes: 
+      in_header: structure.txt
+classoption: "aspectratio=169"
+always_allow_html: yes
+bibliography: refs.bib
+link-citations: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE,
+                      verbose = FALSE,
+                      progress = FALSE,
+                      fig.align = "center",
+                      fig.pos = 'p',
+                      fig.width = 5.8,
+                      fig.height= 2.9,
+                      allowframebreaks = TRUE,
+                      fig.margin=TRUE,
+                      kable.force.latex = TRUE,
+                      cache = TRUE)
+options(kableExtra.latex.load_packages = FALSE)
+pacman::p_load(kableExtra, tidyverse, tidyquant, xtable, magrittr, fpp2, ggpubr)
+```
+
+# Preface
+
+### Recap of What we Have Covered Last Two Weeks
+
+**ARIMA Models:** Models we considered may have three components, an autoregressive component (AR), integrated (I for differencing) and a moving average component (MA).
+
+\begin{block}{\textbf{Main Learning Outcomes from Last 3 Classes}}
+  \begin{itemize}
+			 \item \textbf{Describe the behavior of the ACF and PACF of an ARMA (p,q) process.}
+			\item \textbf{Fit an ARMA model to a time series, evaluate the residuals of a fitted ARMA model to assess goodness of fit, use the Ljung-Box test for correlation among the residuals of an ARIMA model.}
+			 \item \textbf{Use nonseasonal differencing to attain stationarity for a time series.}
+			\item \textbf{Fit an ARIMA model to a time series, evaluate the residuals of a fitted ARMA model to assess goodness of fit, use the Ljung-Box test for correlation among the residuals of an ARIMA model.}
+			 \item \textbf{Show that you can fit reasonable ARIMA models based on both simulated and actual data cases.}
+	\end{itemize}
+\end{block}
+
+
+### Learning Outcomes for Today's Class
+\begin{block}{\textbf{Main Learning Outcomes\footnotemark}}
+  \begin{itemize}
+      \item \textbf{Describe AIC, AICc, and BIC and how they are used to measure model fit.}
+      \item \textbf{Describe the algorithm used within the auto.arima() function to fit an ARIMA model.}
+      \item \textbf{Describe the results of the auto.arima() function.}
+	\end{itemize}
+\end{block}
+
+\footnotetext{Today's class slides are based on  \href{https://miamioh.edu/fsb/directory/?up=/directory/farmerl2}{Dr. Allison Jones-Farmer's} lecture notes, Miami University, Spring 2020.}
+
+# Some Measures of Goodness of Fit
+
+### Additional Measures of Goodness of Fit {.allowframebreaks}
+
+**Akaike’s Information Criterion:** Akaike suggests measuring the goodness of fit of a model by balancing the error of the fit against the number of parameters in the model.
+
+$AIC = 2k - 2\ln{\hat{(L)}}$, 
+
+where $k$ is the number of parameters in the model and $\hat{L}$ is the sample likelihood function. The value of $k$ that gives a minimum AIC gives the best model. This is simply a penalty imposed on the error variance for the number of
+parameters in the model.
+
+
+**Bias Corrected AIC:** $AICc = AIC + \frac{2k^2 + 2k}{n - k - 1}$.
+
+The AICc is usually preferred over the AIC.
+
+
+**Bayesian Information Criterion:** $BIC = \ln{(n)}k - 2\ln{\hat{(L)}}$. 
+
+BIC is also known as the Schwarz Information Criterion (SIC). The BIC has
+a larger penalty for model size and tends to choose smaller models.
+
+
+**Studies have shown:**  
+
+  - BIC does well at getting correct model in large samples.  
+  - AICc tends to get correct models in smaller samples with a large number of parameters.
+  
+  
+**Why did we discuss these metrics today?**  
+
+  - They were printed with some of the models that we have examined in class.   
+  - They are used with the `auto.arima()`, which comes from the [forecast package](https://cran.r-project.org/web/packages/forecast/forecast.pdf) (loaded with `fpp2`).
+
+
+# The `auto.arima()` Function
+
+### The `auto.arima()` Function {.allowframebreaks}
+
+The auto.arima() function can be used to automatically fit ARIMA models to a time series. It is a useful function, but it should be used with caution.
+
+**The function**  
+
+  - Uses “brute force” to fit many models and then selects the “best” based on a certain model criterion  
+  - Works best when the data are stationary, but can be used with nonstationary data  
+  - Tends to overfit the data  
+  - Should always be used as a starting point for selecting a model and all models derived from the `auto.arima()` function should be properly vetted and evaluated.
+
+
+The `auto.arima()` function combines  
+  - Unit root tests (KPSS by default)  
+  - Minimization of AICc
+to obtain an $ARIMA(p,d,q)$ model using the following algorithm:
+
+
+  1. Determine the number of differences, $d$, using a sequence of KPSS tests.  
+  
+  2. Determine $p$ and $q$ by minimizing AICc after differencing the data d times. Rather than considering all possible $p$ and $q$ combinations, a stepwise approach is taken.  
+      - The best initial model with lowest AICc is selected from the following four:   
+        - ARIMA (2,$d$,2),  
+        - ARIMA (0,$d$,0),  
+        - ARIMA (1,$d$,0), and   
+        - ARIMA (1,$d$,0).  
+        - *If d=0, then a constant, $c$, is included. If $d \ge 1$, then the constant is set to 0. The results of this step is called the current model.*  
+      - Variations on the current model are considered by  
+        - Vary $p$ and/or $q$ from current model by $\pm 1$  
+        - Include/exclude $c$ from current model.  
+        - The best model considered so far (either current or one of variations) becomes the *new current model*. 
+      - Repeat previous step until no lower AICc can be found.
+    
+
+### Live Coding: Example 1
+
+In class, we will use a different snapshot of the GNP data that we have explored in class so far. The purpose of this different snapshot is two-fold:  
+  - we are not sure whether the model we fit last class would be appropriate (so this is somewhat of a revision of what to do in order to fit the "best" ARIMA model by hand).      - Walk you through the process of finding the model selected from the `auto.arima()`
+  
+```{r autoArima}
+pacman::p_load(astsa)
+gnpData = gnp # will be loaded from the astsa package until 2002
+
+# We will build on this example in class
+```
+
+
+### Live Coding: Example 2
+```{r birthData}
+birthData = birth # also from the astsa package
+```
+
+
+
+
+### Things to Do to Prepare for Next Class
+
+ - Thoroughly read Chapters 6.2-6.8 of our textbook.
+ 
+ - Go through the slides, examples and make sure you have a good understanding of what we have covered.  
+ 
+ 
+
+
+---
+
+\maketitle
