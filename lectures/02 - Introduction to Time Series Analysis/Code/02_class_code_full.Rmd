@@ -1,0 +1,119 @@
+---
+title: "ISA 444: Business Forecasting"
+subtitle: "02 - Introduction to Time Series Analysis"
+author: Fadel M. Megahed
+date: "January 27, 2021"
+output: 
+  html_document:
+    toc: TRUE
+    toc_float: TRUE
+    number_sections: TRUE
+    theme: spacelab
+    paged_df: TRUE
+    code_folding: show
+    code_download: TRUE
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE,
+                      cache = FALSE,
+                      progress = FALSE, 
+                      verbose = FALSE,
+                      dpi = 600,
+                      dev = 'png',
+                      out.width = '100%')
+```
+
+# Loading the Required Packages
+```{r packages}
+if(require(pacman)==FALSE) install.packages('pacman') # check and install if needed
+pacman::p_load(tidyverse, COVID19, scales)
+
+```
+
+
+# Two Quick Comments Based on Last Class {.tabset .tabset-fade .tabset-pills}
+
+## Beautifying any data frame output {-}
+
+We can capitalize on the [DT](https://rstudio.github.io/DT/) package to beautify any data frame output in R Markdown. For the purpose of being quick, let us compare printing out the built in `iris` dataset using print and the `DT::datatable()` function. 
+```{r sampleOutput}
+pacman::p_load(tidyverse, DT) # loading the tidyverse and DT packages
+
+iris %>% head(2) # showing only the first two rows for space purposes
+
+datatable(iris, # name of data frame to be printed 
+          extensions = c('FixedColumns', 'Buttons'), # extensions used
+          rownames = FALSE,
+          options = list(
+            dom = 'Bfrtip', # B is the buttons extension, f filtering input, see https://datatables.net/reference/option/dom
+            scrollX = TRUE, # scrolling along the x-axis
+            buttons = c('copy', 'csv', 'excel', 'pdf'), # Buttons used from the extensions command in Line 40
+            fixedColumns = list(leftColumns = 1)) ) %>% # fixing left 1 column due to FixedColumns (similar to viewPane in Excel)
+  formatRound(columns= c('Sepal.Length', 'Sepal.Width'), digits=0) # from DT, specifying formatting to specific cols
+```
+
+
+## Potential Issue for Mac Users with the tidyquant package {-}
+
+After last class, one of your colleagues informed me that she had issues in installing the [timetk](https://business-science.github.io/timetk/) package on her Macbook Pro. Given that I do not have a MacBook, I am not able to replicate the error. However, if you are one of these students you have the following options:  
+
+**Plan A:**
+
+  (1) Ensure that your MacOS is up to date (see [how to update the software on your Mac](https://support.apple.com/en-us/HT201541) for more details).  Note that per the [CRAN Documentation](https://cran.r-project.org/bin/macosx/):    
+    (a) R 4.0.3 binary for macOS 10.13 (High Sierra) and higher, signed and notarized package. Contains R 4.0.3 framework, R.app GUI 1.73 in 64-bit for Intel Macs, Tcl/Tk 8.6.6 X11 libraries and Texinfo 6.7. The latter two components are optional and can be ommitted when choosing "custom install", they are only needed if you want to use the tcltk R package or build package documentation from sources.  
+    (b) Note: the use of X11 (including tcltk) requires [XQuartz](http://xquartz.macosforge.org/) to be installed since it is no longer part of OS X. Always re-install XQuartz when upgrading your macOS to a new major version.    
+    (c) **Important:** this release uses Xcode 10.1 and GNU Fortran 8.2. If you wish to compile R packages from sources, you will need to download and GNU Fortran 8.2 - see the [tools](https://cran.r-project.org/bin/macosx/tools/) directory.  
+    
+  (2) Once you have updated your MacOS software, I would recommend uninstalling both RStudio and R (in that order).  
+  (3) Then, I would recommend reinstalling R and RStudio (in that order).  
+  (4) Now, you can attempt to re-install the packages that we used last class (`pacman`, `tidyverse`, `tidyquant`). Hopefully, you will be able to install tidyquant.  
+  (5) If not, I would recommend installing an earlier version of timetk per [this GitHub Issue Response](https://github.com/business-science/timetk/issues/70#issuecomment-764727521). This can be done as follows:   
+    (a) `remove.packages(timetk)` -- assuming it was installed incorrectly.  
+    (b) `install.packages('https://cran.r-project.org/src/contrib/Archive/timetk/timetk_2.6.0.tar.gz', repos=NULL, type="source")`, which may be the only step you need if (a) is not needed/ returns an error. 
+    
+    
+**Plan B:**  
+I wrote a function that would mimic the output needed from the `tidyquant::tq_get()`. This function can be brought into your working directory using the following command: `source('https://raw.githubusercontent.com/fmegahed/businessForecasting/master/custom_functions/tq_get.R')`. **Note that you will have to do that for every R session, i.e, you can consider this command to be in lieu of the `pacman::p_load(tidyquant)` command.**
+
+
+# Visualizing COVID-19 Data
+
+## Getting the Data
+
+```{r getCOVIDdata, cache=TRUE}
+statesCOVID = covid19(country = 'US',
+                      level = 2,
+                      start = '2020-03-01')
+
+# Using the %in% to say if its either Ohio or Kentucky
+df1 = statesCOVID %>% filter(administrative_area_level_2 %in% c('Ohio', 'Kentucky') )
+
+# Alternatively you can use OR (|) 
+df2 = statesCOVID %>% filter(administrative_area_level_2 == 'Ohio' |  administrative_area_level_2 == 'Kentucky')
+```
+
+## Plot the Data {.tabset .tabset-fade .tabset-pills}
+
+### A Non-Paneled Line Plot {-}
+
+```{r covidPlot1}
+df1 %>% ggplot(aes(x = date, y = confirmed, group = id, color = administrative_area_level_2 )) +
+  geom_line() +
+  scale_y_continuous(labels = comma) + # makes the y-axis ticks more readable
+  labs(x = 'Date', y = 'Total/Cumulative Cases', color = 'State' ) +
+  theme_bw() + 
+  theme(legend.position = 'top') # to change the location of the legend to top
+```
+
+### A Paneled Line Plot {-}
+
+```{r covidPlot2}
+df1 %>% ggplot(aes(x = date, y = confirmed, group = id, color = administrative_area_level_2 )) +
+  geom_line() + facet_wrap(~ administrative_area_level_2, ncol = 2, scales = 'free_y') +
+  scale_y_continuous(labels = comma) + # makes the y-axis ticks more readable
+  labs(x = 'Date', y = 'Total/Cumulative Cases', color = 'State' ) +
+  theme_bw() + theme(legend.position = 'top')
+```

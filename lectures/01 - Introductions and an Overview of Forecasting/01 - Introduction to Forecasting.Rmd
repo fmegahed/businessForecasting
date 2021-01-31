@@ -2,7 +2,7 @@
 title: "ISA 444: Business Forecasting"
 subtitle: "01 - Course Overview, Introductions and an Overview of Forecasting"
 author: Fadel M. Megahed
-date: 'Fall 2020'
+date: 'Spring 2021'
 output:
   beamer_presentation:
     number_sections: false
@@ -42,8 +42,6 @@ pacman::p_load(kableExtra, tidyverse, xtable)
 	\begin{itemize}
 			\item \textbf{Describe course objectives \& structure.}
 			\item \textbf{Describe what do we mean by \textcolor{miamired}{forecasting} and explain the \textcolor{miamired}{PIVASE} framework.}
-			\item \textbf{Explain the differences between cross sectional, time series, and panel datasets.}
-			\item \textbf{Identify and describe the basic components of a time series including trends, seasonal components, and cycles.}
 	\end{itemize}
 \end{block}
 
@@ -105,26 +103,26 @@ pacman::p_load(kableExtra, tidyverse, xtable)
 	
 \begin{figure}
 	\centering
-	\href{https://tinyurl.com/y2pqfgm6}{\includegraphics[width=\textwidth, height = 0.7\textheight, keepaspectratio, frame]{Figures/forecastAnalyst1.png}}
-	\caption{Required qualifications for a \textit{forecast analyst} position. Click on the image to open the ad.}
+	\includegraphics[width=\textwidth, height = 0.7\textheight, keepaspectratio, frame]{Figures/forecastAnalyst1.png}
+	\caption{Required qualifications for a \textit{forecast analyst} position.}
 \end{figure}
 
 \begin{figure}
 	\centering 
-	\href{https://tinyurl.com/y4pau6hk}{\includegraphics[width=\textwidth, height = 0.7\textheight, keepaspectratio, frame]{Figures/forecastAnalyst2.png}}
-	\caption{Required qualifications for a \textit{Risk Capacity Planning Analyst} at Paypal. Click on the image to open the ad.}
+	\includegraphics[width=\textwidth, height = 0.7\textheight, keepaspectratio, frame]{Figures/forecastAnalyst2.png}
+	\caption{Required qualifications for a \textit{Risk Capacity Planning Analyst} at Paypal.}
 \end{figure}
 
 \begin{figure}
 	\centering 
-	\href{https://tinyurl.com/y5v86ga4}{\includegraphics[width=0.7\textwidth, height = 0.6\textheight, keepaspectratio, frame]{Figures/forecastAnalyst3.png}}
-	\caption{Required qualifications for a \textit{Lead Business Intelligence Analyst} at Spectrum Health. Click on the image to open the ad.}
+	\includegraphics[width=0.9\textwidth, height = 0.7\textheight, keepaspectratio, frame]{Figures/forecastAnalyst3.png}
+	\caption{Required qualifications for a \textit{Lead Business Intelligence Analyst} at Spectrum Health.}
 \end{figure}
 
 \begin{figure}
 	\centering
 	\href{https://tinyurl.com/y6l7k2cc}{\includegraphics[width=\textwidth, height = 0.7\textheight, keepaspectratio, frame]{Figures/indeed.png}}
-	\caption{Number of full-time, entry-level, \$100,000+ jobs on \textit{Indeed.com}, with the term "forecasting" as of August 14, 2020. Click on the image to update the search.}
+	\caption{Number of full-time, entry-level, \$100,000+ jobs on \textit{Indeed.com}, with the term "forecasting" as of January 22, 2021. Click on the image to update the search.}
 \end{figure}
 
 
@@ -195,7 +193,7 @@ pacman::p_load(kableExtra, tidyverse, xtable)
 		\caption{An overview of the evaluation components for ISA 444.}
 	\end{figure}
 
-\footnotetext{Note that I drop the lowest three graded class assignments/activities. We should have 20+ of these graded assignments/activities during the semester.}
+\footnotetext{Note that I drop the lowest three graded class assignments/activities. We should have 15+ of these graded assignments/activities during the semester.}
 
 
 ### About Me - My Route to Miami University
@@ -230,7 +228,7 @@ pacman::p_load(kableExtra, tidyverse, xtable)
 ### When I Searched for Forecast on the Web
 \begin{figure}
   \centering
-  \href{https://tinyurl.com/yyktgqz2}{\includegraphics[width=0.9\textwidth, height = 0.7\textheight, frame, keepaspectratio]{Figures/forecast.png}}
+  \href{https://tinyurl.com/yyktgqz2}{\includegraphics[width=0.9\textwidth, height = 0.75\textheight, frame, keepaspectratio]{Figures/forecast.png}}
   \caption{People tend to link forecasting to the "weather" (at least that is what search engines think).}
 \end{figure}
 
@@ -238,7 +236,7 @@ pacman::p_load(kableExtra, tidyverse, xtable)
 
 \begin{figure}
   \centering
-  \href{https://tinyurl.com/y5h5k4aj}{\includegraphics[width=0.9\textwidth, height = 0.7\textheight, frame, keepaspectratio]{Figures/forecastDef.png}}
+  \href{https://tinyurl.com/y5h5k4aj}{\includegraphics[width=0.9\textwidth, height = 0.75\textheight, frame, keepaspectratio]{Figures/forecastDef.png}}
   \caption{The definition of the term "forecast" as obtained from Bing/Merriam-Webster.}
 \end{figure}
 
@@ -278,13 +276,13 @@ A \textbf{\textcolor{miamired}{time series}} is a sequence of observations on a 
 
 ```{r timeseries, echo=FALSE, fig.fullwidth = TRUE}
 if(require(pacman)==FALSE) install.packages("pacman")
-pacman::p_load(tidyquant, tidyverse)
+pacman::p_load(tidyquant, tidyverse, scales)
 FANG = tq_get(c('FB', 'AMZN', 'NFLX', 'GOOG'),
               from = "2020-01-01")
-FANG %>% ggplot(aes(x = date, y = adjusted, group = symbol)) +
-  geom_line() + 
-  labs(y = "Adjusted Closing Price", x = "2020") +
-  facet_wrap(~ symbol, ncol = 2, scale = "free_y") +
+FANG %>% ggplot(aes(x = date, y = adjusted, group = symbol)) + 
+  facet_wrap(~symbol, ncol = 2, scale = 'free_y') + 
+  geom_line() + scale_x_date(breaks = pretty_breaks(n=4)) +
+  labs(y = "Adjusted Closing Price", x = "Date") +
   theme_bw()
 ```
 
@@ -301,7 +299,7 @@ percent change in each of the four stock prices when compared to January 2, 2020
 if(require(pacman)==FALSE) install.packages("pacman")
 pacman::p_load(tidyquant, tidyverse)
 FANG %>% filter(date == '2020-01-02') %>% select(symbol, adjusted) -> baseFANG
-FANG %>% filter(date == '2020-08-12') %>% select(symbol, adjusted) -> currentFANG
+FANG %>% filter(date == '2021-01-22') %>% select(symbol, adjusted) -> currentFANG
 colnames(baseFANG)[2] = 'base'
 colnames(currentFANG)[2] = 'current'
 combinedFANG = merge(baseFANG, currentFANG, by ="symbol") %>% 
@@ -312,7 +310,20 @@ cat(paste0('The percent changes (from January 2, 2020) in the AMZN, FB, GOOG and
     round(combinedFANG[4,4],1), '%, respectively.'))
 ```
 
-\footnotetext{The printed numbers from my computations had a current date of August 14, 2020. Thus, the numbers will change (slightly) unless we use the same ending date for our calculations.}
+\footnotetext{The printed numbers from my computations had a current date of January 21, 2021. Thus, the numbers will change (slightly) unless we use the same ending date for our calculations.}
+
+
+### In-Class Activity
+
+Based on the previous exercise, use the [COVID-19 package](https://covid19datahub.io/articles/api/r.html) to plot the confirmed COVID-19 cases for the states of Ohio and Kentucky. You should create two plots: (a) plot containing both of the states as two seperate lines in a line plot, and (b) a paneled plot similar to the output depicted in Slide 21.
+
+**Hints:**  
+
+  (1) Once you have installed the package inspect the `covid19` function using the command `?covid19()`.  
+  (2) Set the country argument to the US.   
+  (3) Use an apporpriate value for the level argument based on `?covid19()`.  
+  (4) Set the starting date to '2020-03-01'
+  (5) Filter the obtained data to only include data for the two states.
 
 
 ### Why do we Forecast? -- A Conceptual Framework (PIVASE)\footnotemark
@@ -343,239 +354,6 @@ cat(paste0('The percent changes (from January 2, 2020) in the AMZN, FB, GOOG and
 \footnotetext{From: Ord, K., Fildes, R., \& Kourentzes, N. (2017). Principles of Business Forecasting (2nd ed., p. 7).}
 
 
-
-# Types of Data Over Time
-
-### Cross Sectional Data [1]
-
-
-**Cross Sectional Data:** Measurements on multiple units, recorded in a single time period.
-
-\textbf{\textcolor{miamired}{Example 1: H1B 2020 Data for Senior Data Scientists at Netflix}}\footnotemark
-
-```{r netflixSalaries, results='asis', echo=FALSE}
-if(require(pacman)==FALSE) install.packages(pacman)
-pacman::p_load(lubridate, rvest, xtable)
-read_html("https://h1bdata.info/index.php?em=NETFLIX+INC&job=SENIOR+DATA+SCIENTIST&city=LOS+GATOS&year=2020") %>%
-  html_node("#myTable") %>% html_table() -> netflixSalaries
-netflixSalaries$`START DATE` = mdy(netflixSalaries$`START DATE`)
-netflixSalaries2020 = netflixSalaries %>%  filter(`START DATE` >= '2020-01-01') %>% 
-  select(EMPLOYER, `JOB TITLE`, `BASE SALARY`, LOCATION)
-print(xtable(netflixSalaries2020, align = c(rep('c', 5)) ), comment = FALSE, size = '\\scriptsize', 
-      include.rownames=FALSE)
-```
-
-\footnotetext{Data scraped from \url{https://h1bdata.info/index.php?em=NETFLIX+INC&job=SENIOR+DATA+SCIENTIST&city=LOS+GATOS&year=2020} on August 14, 2020 using the \href{https://cran.r-project.org/web/packages/rvest/rvest.pdf}{rvest} package in R. The printing was limited to those individuals who started on/after January 01, 2020, with the filters specified in the URL.}
-
-
-### Cross Sectional Data [2]
-
-
-**Cross Sectional Data:** Measurements on multiple units, recorded in a single time period.
-
-\textbf{\textcolor{miamired}{Example 2: Heart Disease Dataset}}\footnotemark
-
-```{r heart, results='asis', echo=FALSE}
-set.seed(444)
-heart = read.delim("https://archive.ics.uci.edu/ml/machine-learning-databases/statlog/heart/heart.dat",
-                  header = FALSE, sep = " ") %>% select(c(1,2,4,8,14)) %>% sample_n(., 13) 
-colnames(heart) = c('age', 'sex', 'restingBP', 'maxHR', 'label')
-print(xtable(heart, align = c(rep('c', 6)) ), comment = FALSE, size = '\\scriptsize', 
-      include.rownames=FALSE)
-```
-
-\footnotetext{Data sampled from \href{https://archive.ics.uci.edu/ml/datasets/statlog+(heart)}{this UCI Machine Learning Repository}.}
-
-
-### Cross Sectional Data [3]
-
-
-**Cross Sectional Data:** Measurements on multiple units, recorded in a single time period.
-
-\textbf{\textcolor{miamired}{Example 3: NBA 2019-2020 Leaders - Top 12 in PTS/Game}}\footnotemark
-
-```{r nba, echo = FALSE, results='asis'}
-nbaPerGame = read_html("https://www.basketball-reference.com/leagues/NBA_2020_per_game.html") %>% 
-  html_node("#per_game_stats") %>% html_table() %>% filter(!PTS %in% "PTS")
-nbaPerGame$PTS = as.numeric(nbaPerGame$PTS)
-nbaPerGame %>% arrange(desc(PTS)) %>% select(Player, Pos, Age, Tm, G, FG, `FG%`, `eFG%`, PTS) %>% 
-  head(n = 12) -> nbaPerGame
-print(xtable(nbaPerGame, align = c('l', 'l', rep('c', 8)) ), comment = FALSE, size = '\\scriptsize', 
-      include.rownames=FALSE)
-```
-
-\footnotetext{Data scraped from \href{https://www.basketball-reference.com/leagues/NBA_2020_per_game.html}{Basketball-Reference} on August 14, 2020 using the \href{https://cran.r-project.org/web/packages/rvest/rvest.pdf}{rvest} package in R. The printing with limited to the top 12 players and the selected variables.}
-
-
-
-### Time Series Data [1]
-
-**Time Series Data:** Comparable measurements recorded on a single (or a few) variables over time (usually a long period of time).
-
-\textbf{\textcolor{miamired}{Example 1: Net Power Generation in the U.S.}}
-
-\begin{figure}
-  \centering
-  \href{https://www.eia.gov/electricity/data/browser/}{\includegraphics[width=\textwidth, height=0.5\textheight, keepaspectratio, frame]{eiaChart.png}}
-  \caption{Net monthly electricity generation in the U.S. from the \href{https://www.eia.gov/electricity/data/browser/}{U.S. Energy Information Adminstration}.}
-\end{figure}
-
-
-### Time Series Data [2]
-
-\textbf{\textcolor{miamired}{Example 2: Stock prices of U.S. Airlines}}
-
-\vspace{-0.5\baselineskip} 
-
-```{r timeseries2, echo=FALSE, fig.fullwidth = FALSE}
-if(require(pacman)==FALSE) install.packages("pacman")
-pacman::p_load(tidyquant, tidyverse)
-airlines = tq_get(c('DAL', 'UAL', 'AAL', 'LUV'),
-              from = "2020-01-01")
-airlines %>% ggplot(aes(x = date, y = adjusted, group = symbol)) +
-  geom_line() + 
-  labs(y = "Adjusted Closing Price", x = "2020") +
-  facet_wrap(~ symbol, ncol = 2, scale = "free_y") +
-  theme_bw()
-```
-
-\vspace{-1.25\baselineskip} 
-
-\centering{\textcolor{darkgreen}{As of August 14, 2020: COVID-19 had a substantial impact on these airline stocks.}}
-
-
-
-### Panel Data
-
-
-**Panel Data:** Cross sectional measurements (usually many variable) repeated over time (usually over a few time periods).
-
-\textbf{\textcolor{miamired}{Example: World Bank's Data}}\footnotemark
-
-```{r wb, results='asis', echo=FALSE}
-pacman::p_load(wbstats)
-macroData = wb_data(country = c('CN','EG','US'),
-               indicator = c('NY.GDP.MKTP.KD.ZG', 'SP.DYN.LE00.IN', 'SH.DYN.NMRT', 'SH.HIV.INCD.ZS',
-                             'SH.MED.BEDS.ZS', 'SH.MED.PHYS.ZS', 'SH.PRV.SMOK', 'SH.STA.TRAF.P5'),
-               mrv = 3, return_wide = TRUE, gapfill = TRUE) %>% 
-  select(-c(iso2c, country))
-print(xtable(macroData, align = c(rep('c', 11)) ), comment = FALSE, size = '\\tiny', 
-      include.rownames=FALSE)
-```
-
-\footnotetext{Data queried from the \href{https://datacatalog.worldbank.org/}{World Bank Data Catalog} using the \href{https://cran.r-project.org/web/packages/wbstats/wbstats.pdf}{wbstats} package in R. The printed results show a snapshot of 7 variables (out of a much larger panel dataset). You can think of panel data as a cross-sectional dataset with a longitudinal/time component.}
-
-
-
-
-# Components of a Time Series
-
-### Trend [1]
-
-A **trend** is an increasing or decreasing pattern over time.
-
-```{r trendUP, echo=FALSE}
-pacman::p_load(tidyquant, tidyverse)
-amazon = tq_get(c('AMZN'), from = "2020-04-01", to = "2020-08-14")
-amazon %>% ggplot(aes(x = date, y = adjusted)) +
-  geom_line() + 
-  labs(y = "Adjusted Closing Price", x = "2020", 
-       title = "Increasing Trend", 
-       subtitle = "The meteoric rise of $AMZN from 2020-04-01 to 2020-08-14") +
-  theme_bw()
-```
-
-
-### Trend [2]
-
-A **trend** is an increasing or decreasing pattern over time.
-
-```{r trendDown, echo=FALSE}
-pacman::p_load(tidyquant, tidyverse)
-delta = tq_get(c('DAL'), from = "2020-02-03", to = "2020-04-30")
-delta %>% ggplot(aes(x = date, y = adjusted)) +
-  geom_line() + 
-  labs(y = "Adjusted Closing Price", x = "2020", 
-       title = "Decreasing Trend", 
-       subtitle = "The decline in $DAL from 2020-02-03 to 2020-04-30") +
-  theme_bw()
-```
-
-
-
-### Seasonality [1]
-
-**Seasonality** refers to the property of a time series that displays REGULAR patterns that repeat at a constant frequency (*m*).
-
-\begin{figure}
-  \centering 
-  \includegraphics[width=\textwidth, height = 0.55\textheight, keepaspectratio]{Figures/seasonal.jpg}
-  \caption{A time series with a monthly seasonal pattern.\footnotemark}
-\end{figure}
-
-\footnotetext{Figure is from \href{https://miamioh.edu/fsb/directory/?up=/directory/farmerl2}{Dr. Allison Jones-Farmer's} lecture notes, Miami University, Spring 2020.}
-
-
-### Seasonality [2]
-
-**Seasonality** refers to the property of a time series that displays REGULAR patterns that repeat at a constant frequency (*m*).
-
-\vspace{-0.5\baselineskip}
-
-```{r retailSales, echo=FALSE}
-pacman::p_load(lubridate)
-retail = read.csv("https://fred.stlouisfed.org/graph/fredgraph.csv?bgcolor=%23e1e9f0&chart_type=line&drp=0&fo=open%20sans&graph_bgcolor=%23ffffff&height=450&mode=fred&recession_bars=on&txtcolor=%23444444&ts=12&tts=12&width=1168&nt=0&thu=0&trc=0&show_legend=yes&show_axis_titles=yes&show_tooltip=yes&id=RSXFSN&scale=left&cosd=1992-01-01&coed=2020-07-01&line_color=%234572a7&link_values=false&line_style=solid&mark_type=none&mw=3&lw=2&ost=-99999&oet=99999&mma=0&fml=a&fq=Monthly&fam=avg&fgst=lin&fgsnd=2020-02-01&line_index=1&transformation=lin&vintage_date=2020-08-15&revision_date=2020-02-01&nd=2010-01-01")
-retail %>% ggplot(aes(x = ymd(DATE), y = RSXFSN)) +
-  geom_line() + 
-  labs(x=NULL,
-       title = "Seasonality with an Additive Trend", 
-       subtitle = "Retail (- Food Services) from 2010-01-01 to 2020-02-01",
-       caption = 'Data from FRED') +
-  theme_bw()
-```
-
-### Seasonality [3]
-
-```{r airpassengers, echo=FALSE}
-pacman::p_load(ggfortify)
-data("AirPassengers")
-autoplot(AirPassengers) + 
-  labs(x=NULL, title = "Seasonality with a Multiplicative Trend", 
-       subtitle = "Non-linear trend & seasonal component grows over time",
-       caption = 'AirPassengers R Dataset -- Source: Box, G. E. P., Jenkins, G. M. and \n Reinsel, G. C. (1976) Time Series Analysis, Forecasting and Control.') +
-  theme_bw()
-```
-
-
-### Cycle [1]
-**Cyclical fluctuations** are somewhat irregular (unknown duration).
-
-\vspace{-0.5\baselineskip}
-
-```{r autoSales, echo=FALSE}
-pacman::p_load(lubridate)
-autoSales = read.csv("https://fred.stlouisfed.org/graph/fredgraph.csv?bgcolor=%23e1e9f0&chart_type=line&drp=0&fo=open%20sans&graph_bgcolor=%23ffffff&height=450&mode=fred&recession_bars=on&txtcolor=%23444444&ts=12&tts=12&width=1168&nt=0&thu=0&trc=0&show_legend=yes&show_axis_titles=yes&show_tooltip=yes&id=TOTALSA&scale=left&cosd=1976-01-01&coed=2020-07-01&line_color=%234572a7&link_values=false&line_style=solid&mark_type=none&mw=3&lw=2&ost=-99999&oet=99999&mma=0&fml=a&fq=Monthly&fam=avg&fgst=lin&fgsnd=2020-02-01&line_index=1&transformation=lin&vintage_date=2020-08-15&revision_date=2020-08-15&nd=1976-01-01")
-autoSales %>% ggplot(aes(x = ymd(DATE), y = TOTALSA)) +
-  geom_line() + 
-  labs(x=NULL,
-       title = "The cyclical nature of auto sales",
-       caption = 'U.S. Bureau of Economic Analysis, Total Vehicle Sales [TOTALSA], retrieved from FRED, Federal Reserve Bank of St. Louis \n https://fred.stlouisfed.org/series/TOTALSA, August 14, 2020.') +
-  theme_bw()
-```
-
-
-### Cycle [2]
-**Cyclical fluctuations** are somewhat irregular (unknown duration).
-
-\vspace{-0.5\baselineskip}
-
-\begin{figure}
-  \includegraphics[width=0.7\textwidth, height = 0.7\textheight, keepaspectratio]{Figures/Step1.jpg}
-  \caption{A gait "cycle" from an IMU attached to the ankle. Joint work with the University at Buffalo.}
-\end{figure}
-
-
-
 # Recap
 
 ### Summary of Main Points
@@ -584,15 +362,13 @@ autoSales %>% ggplot(aes(x = ymd(DATE), y = TOTALSA)) +
 	\begin{itemize}
 			\item \textbf{Describe course objectives \& structure.}
 			\item \textbf{Describe what do we mean by \textcolor{miamired}{forecasting} and explain the \textcolor{miamired}{PIVASE} framework.}
-			\item \textbf{Explain the differences between cross sectional, time series, and panel datasets.}
-			\item \textbf{Identify and describe the basic components of a time series including trends, seasonal components, and cycles.}
 	\end{itemize}
 \end{block}
 
 
 ### Things to Do
 
- - Thoroughly read Chapter 1 of our book, which can be downloaded from the \href{https://wessexlearning.com/collections/business-analytics/products/principles-of-business-forecasting-2nd-ed}{Publisher} (if you have not gotten your book yet).  
+ - Thoroughly read Sections 1.1 and 1.2 of our book, which can be downloaded from the \href{https://wessexlearning.com/collections/business-analytics/products/principles-of-business-forecasting-2nd-ed}{Publisher} (if you have not gotten your book yet).  
  
  - Go through the slides, examples and make sure you have a good understanding of what we have covered. 
  
@@ -601,17 +377,18 @@ autoSales %>% ggplot(aes(x = ymd(DATE), y = TOTALSA)) +
 
 ### Graded Assignment: Evaluating your Retention/Focus
 
-Please go to \href{https://miamioh.instructure.com/courses/123532/quizzes/317526}{Canvas (click here)} and answer the four questions. **Due August 21, 2020 [11:59 PM,
+Please go to \href{https://miamioh.instructure.com/courses/123532/quizzes/317526}{Canvas (click here)} and answer the four questions. **Due January 28, 2021 [11:59 PM,
 Ohio local time].** 
 
-**What/Why/Prep?** The purpose of this assignment is to evaluate your understanding and retention of the material covered in Class 01. In order to prepare for this, you should have either actively attended class and/or watched the recording from WebEx.
+**What/Why/Prep?** The purpose of this assignment is to evaluate your understanding and retention of the material covered in Class 01. In order to prepare for this, you should have either actively attended class and/or watched the recording from WebEx. In addition, you should have read Sections 1.1 and 1.2 from our textbook.
 
 **General Guidelines:**  
 
 \vspace{-0.5\baselineskip}
 
   - Individual assignment.  
-  - This is a timed assignment (i.e. once you start the assignment you will have 25 minutes to complete 4 questions). The purpose of the time limit is to help you evaluate how much you have retained/understood from class. If the concepts we covered today are well-understood, this should take 10-15 minutes.  
+  - This is not a timed assignment.  
+  - The assignment contains four questions (1 T/F, 2 numeric inputs and a file upload).  
   - Proctorio is NOT required for this assignment.  
   - You will need to have R installed (or accessible through the \href{https://virtualpc.fsb.miamioh.edu/RDWeb/Pages/en-US/default.aspx}{Remote Desktop})
 
