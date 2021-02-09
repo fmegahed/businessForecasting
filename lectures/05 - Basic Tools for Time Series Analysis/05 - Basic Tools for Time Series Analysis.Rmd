@@ -1,0 +1,585 @@
+---
+title: "ISA 444: Business Forecasting"
+subtitle: "05 - Basic Tools for Time Series Analysis"
+author: Fadel M. Megahed
+date: 'Spring 2021'
+output:
+  beamer_presentation:
+    number_sections: false
+    toc: false
+    slide_level: 3
+    includes: 
+      in_header: structure.txt
+classoption: "aspectratio=169"
+always_allow_html: yes
+bibliography: refs.bib
+link-citations: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE,
+                      verbose = FALSE,
+                      progress = FALSE,
+                      fig.align = "center",
+                      fig.pos = 'p',
+                      fig.width = 5.95,
+                      fig.height= 2.5,
+                      allowframebreaks = TRUE,
+                      fig.margin=TRUE,
+                      kable.force.latex = TRUE,
+                      cache = FALSE)
+options(kableExtra.latex.load_packages = FALSE)
+pacman::p_load(kableExtra, xtable, tidyverse, magrittr)
+```
+
+# Preface
+
+### What we Covered Last Week
+
+\begin{block}{\textbf{Main Learning Outcomes}}
+			$\quad$ \textcolor{darkgreen}{\large \checkboxFadel} \textbf{Explain different goals for visualizing time series data} \\  
+			$\quad$ \textcolor{darkgreen}{\large \checkboxFadel} \textbf{Identify an appropriate chart for a specific time series data visualization goal} \\
+			$\quad$ \textcolor{darkgreen}{\large \checkboxFadel} \textbf{Use software to construct charts of interest} \\
+			$\quad$ \textcolor{darkgreen}{\large \checkboxFadel} \textbf{Use numerical summaries to describe a time series.} \\
+			$\quad$ \textcolor{miamired}{\large $\boxtimes$}\textbf{Apply transformations to a time series.}
+\end{block}
+
+
+### Recap: A Structured Approach for Time Series Visualization
+
+\vspace{\baselineskip}
+
+\begin{figure}
+		\centering
+		\adjustbox{max width=\textwidth, frame}{%
+			\begin{forest}
+				[\Large{\textbf{Time Series Visualization}}
+				[\textcolor{miamired}{\textbf{\large Singular Time Series}}
+				[\textbf{Plot the Entire Series}
+				[Look for
+				[\textit{Trends}]
+				[\textit{Seasonality}]
+				[\textit{Cycles}]
+				[\textit{Motifs}
+				[High Freq. TS]]]]]
+				[\textcolor{miamired}{\textbf{\large Multiple Time Series}}
+				[\textbf{Few Series}
+				[Scatterplots]
+				[Paneled Line Plots
+				[Look for
+				[\textit{Trends}]
+				[\textit{Seasonality}]
+				[\textit{Cycles}]]]]
+				[\textbf{Many Series}
+				[\textcolor{miamired}{Sample} 
+				[Panel/Combined Plots]]
+				[\textcolor{miamired}{All TS}
+				[Cluster
+				[Summary Plot]
+				[Spaghetti Plot]]]]]]
+		\end{forest}}
+		\caption{A Potential Framework for Time Series Visualization.\footnotemark}
+	\end{figure}
+
+\vspace{-\baselineskip}
+
+\footnotetext{This is my best attempt to improve on the general advice provided in the previous slide. Many of the suggestions, presented in this flow chart, stem from my past and current research/consulting collaborations. They are by no means a comprehensive list of everything that you can do.}
+
+
+### Recap: Numerical Summaries
+
+\begin{figure}
+		\centering
+		\fbox{%
+			\begin{forest}
+				[\LARGE{\textbf{Numercial Summaries}}
+				[\textbf{Measures of Average}
+				[Mean]
+				[Median]]
+				[\textbf{Measures of Variation}
+				[Range]
+				[Deviation]
+				[MAD]
+				[Variance]]
+				[\textbf{Correlation}
+				[Pearson]]]
+		\end{forest}}
+		\caption{An overview of the numerical summaries discussed last class.}
+\end{figure}
+
+
+### Recap: Numerical Summaries do NOT Replace Visuals
+
+\begin{columns}
+  \begin{column}{0.4\textwidth}
+```{r anscombe1, echo = FALSE, results='asis'}
+pacman::p_load(tidyverse, tidyquant, Tmisc, xtable) # same data but in 3 columns
+df = quartet %>% group_by(set) %>% 
+  summarise(x.mean = mean(x), x.sd = sd(x),
+            y.mean = mean(y), y.sd = sd(y),
+            corr = cor(x, y))
+print(xtable(df, align = c(rep('c', 7))), comment = FALSE, size = '\\scriptsize', include.rownames=FALSE)
+```
+  \end{column}%
+  \begin{column}{0.6\textwidth}
+  ```{r anscombe2, results='asis', echo=FALSE, out.width = '100%'}
+ggplot(quartet, aes(x, y)) + geom_point() + 
+  geom_smooth(method = lm, se = FALSE) + facet_wrap(~set) + theme_bw()
+  ```
+  \end{column}
+\end{columns}
+
+
+### Learning Objectives for Today's Class
+\begin{block}{\textbf{Main Learning Outcomes}}
+  \begin{itemize}
+			\item \textbf{Apply transformations to a time series.}
+			\item \textbf{Apply and interpret measures of forecast accuracy.}
+			\item \textbf{Interpret prediction intervals for a simple forecast.}
+	\end{itemize}
+\end{block}
+
+
+# Transformations
+
+### Guidelines for Transforming Time-Series Data
+
+\vspace{\baselineskip}
+
+\begin{figure}
+		\centering
+		\adjustbox{max width=\textwidth, frame}{%
+			\begin{forest}
+				[\Large{\textbf{Transformation Methods for Time Series}}
+				[\textbf{Stabilize the Mean}
+				[\textcolor{miamired}{\textbf{Differencing}}
+				[Eliminate/Reduce
+				[Seasonality]
+				[Trend]]
+				[Compute New Cases\footnotemark]]]
+				[\textbf{Stabilize the Variance}
+				[\textcolor{miamired}{\textbf{Power Transformations}}
+				[Log]
+				[Square Root]]] % stabilize the variance
+				[\textbf{$\sim$Stabilize both}
+				[\textcolor{miamired}{\textbf{Growth Rates}}]
+				[\textcolor{miamired}{\textbf{First diff of Log\footnotemark}}
+				[Exponential Growth TS
+				[$\ln$ to get a TS with a linear trend]
+				[Then diff to get a stationary series]
+				]]]
+				[\textbf{Rescale}
+				[\textcolor{miamired}{\textbf{($0-1$) Scaling\footnotemark}}]
+				[\textcolor{miamired}{\textbf{$z-$transform\footnotemark}}]
+				]
+				]
+		\end{forest}}
+		\caption{A classification of common transformation approaches for time series data.\footnotemark}
+	\end{figure}
+
+\vspace{-\baselineskip}
+
+\addtocounter{footnote}{-5}
+
+\stepcounter{footnote}\footnotetext{The \href{https://covid19datahub.io/}{COVID19 package} returns cumulative cases, i.e. a first difference $\longrightarrow$ new confirmed cases.}
+
+\stepcounter{footnote}\footnotetext{First difference of LOG $\approxeq$ percentage change. This is almost exact if the percentage change is small, but for larger percentage changes, it may differ greatly (see \href{https://faculty.fuqua.duke.edu/~rnau/Decision411_2007/411log.htm}{here for more details}).}
+
+\stepcounter{footnote}\footnotetext{Rescaling of the data from the original range so that all values are within the range of 0 and 1. Mathematically, speaking this can be achieved by calculating $y_t = \frac{x_t - \min}{\max - \min}$.}
+
+\stepcounter{footnote}\footnotetext{One can normalize a time-series by $z_t = \frac{x_t - \mu}{\sigma}$.}
+
+\stepcounter{footnote}\footnotetext{My (incomplete) attempt to provide you with a taxonomy for time series data transformations.}
+
+### Differencing
+
+The change in the time series from one period to the next is known as the (first) difference. It can be computed as follows:
+\begin{equation}
+\begin{split}
+  DY_t &= Y_t - Y_{t-1} \\
+  &\xrightarrow{\text{in \textbf{R}}} \text{\textit{variableName}} - \text{lag}(\text{\textit{variableName}}, \, x = 1)
+\end{split}
+\end{equation}
+
+```{r cardano, echo=FALSE}
+cardano = tq_get("ADA-USD", from = "2021-02-02", to = "2021-02-06") %>% 
+  select(symbol, date, adjusted)
+```
+
+Differences can be computed by capitalizing on `mutate()` and `lag()`.
+
+```{r cardanoDiff, echo=FALSE, results='asis'}
+cardano = tq_get("ADA-USD", from = "2021-02-02", to = "2021-02-06") %>% 
+  select(symbol, date, adjusted)
+cardano %<>% mutate(`DYt` = adjusted - lag(adjusted)) 
+cardano$date = as.character(cardano$date)
+print(xtable(cardano, align = c(rep('c', 5))), comment = FALSE, size = '\\scriptsize', include.rownames=FALSE)
+```
+
+
+### Differencing for Seasonal Data
+If your data exhibits a seasonal pattern, as illustrated in Slides 15-17 in [03-Time-Series-Plots.pdf](https://miamioh.instructure.com/courses/142177/files/18964031?module_item_id=2902123), you should employ a **seasonal differencing approach**, you should subtract the difference between an observation and the previous observation from the same season. Let $m$ denote the number of seasons, e.g. $m=4$ for quarterly data. In such a case, the seasonal difference is computed as follows:
+\begin{equation}
+\begin{split}
+  DY_{t-m} &= Y_t - Y_{t-m} \\
+  &\xrightarrow{\text{in \textbf{R}}} \text{\textit{variableName}} - \text{lag}(\text{\textit{variableName}}, \, x = m)
+\end{split}
+\end{equation}
+
+
+
+### Growth Rates: The Formulation
+
+In the absence of seasonality, the growth rate for a time series is given by
+\begin{equation}
+  GY_t = 100 \frac{Y_t - Y_{t-1}}{Y_{t-1}}
+\end{equation}
+
+In the presence of seasonality (with period $= m$), the growth rate for a time series is given by
+\begin{equation}
+  GY_t = 100 \frac{Y_t - Y_{t-m}}{Y_{t-m}}
+\end{equation}
+
+
+### Growth Rates in Practice -- a Non-Graded Class Activity
+
+- **Question 1:** Let us say that an investor purchased 10 stocks of \$GME, on 2021-01-29, at \$325/stock. The next trading day, 2021-02-01, the \$GME stock closed at \$225. Compute the growth rate in their portfolio worth (assuming it only has the GME stock) over this time period. 
+
+- Let us say that the growth rate, $GY_t = -g$. Now let us assume that the \$GME stock went up by $g$ (i.e., if it went down 10\%, it increased by 10\% over the next trading day).  What is the value of the investor's portfolio by stock market closing on 2021-02-02?
+
+  - Provide the answer to both computational questions on [Canvas](https://miamioh.instructure.com/courses/142177/quizzes/368225).
+
+
+### The Log Transform [1]
+
+The log transformation can be computed as follows:
+\begin{equation}
+  L_t = \ln{(Y_t)}
+\end{equation}
+Note that the `log()` in R takes the natural logarithm as its default base, i.e., would transform a variable/statistic based on the above equation.
+
+The reverse transformation using the exponential function is:
+\begin{equation}
+  e^{L_t} = e^{\ln{(Y_t})} = Y_t
+\end{equation}
+
+The first difference in logarithms represents the logarithm of the ratio:
+\begin{equation}
+  L_t = \ln{(\frac{Y_t}{Y_{t-1}})} = \ln{(Y_t)} - \ln{(Y_{t-1})}
+\end{equation}
+
+
+### The Log Transform [2]
+
+- The primary purpose of the log transform is to **convert exponential growth into linear growth.**
+
+- The transform often has the **secondary purpose of balancing the variance.**  
+
+- Difference in logs and growth rate transformations produce similar results and interpretations.
+
+
+### A Walk through Statistical Transformations Using R {.allowframebreaks}
+
+In this live coding session, we will capitalize on the `mutate()` from [tidyverse](https://www.tidyverse.org/) to create transformations for multiple time series. Specifically, we will use the `tq_get()` from [tidyquant](https://business-science.github.io/tidyquant/) to extract data about the following cryptocurrencies (a) [Cardano](https://cardano.org/) (\$ADA), (b) [Chainlink](https://chain.link/) (\$LINK), and (c) [Zilliqa](https://www.zilliqa.com/) (\$ZIL). We will compute:  
+
+  - Growth Rates  
+  - Natural log
+  - Log Differences  
+  - $[0-1]$ Scaling  
+  
+Obviously, we will have to ensure that these transformations are computed for each coin separately. For the purpose of this activity, let us extract the data from 2020-11-01 to 2021-02-06.  
+
+```{r transformations, echo=FALSE, out.height='2in'}
+coins = tq_get(c('ADA-USD', 'LINK-USD', 'ZIL-USD'), from = '2020-11-01', to ='2021-02-06')
+coins %<>% group_by(symbol) %>% arrange(symbol, date)
+
+coins %<>% mutate(growthRate = 100*(adjusted - lag(adjusted))/lag(adjusted),
+                  naturalLog = log(adjusted),
+                  logDiffs = naturalLog - lag(naturalLog),
+                  minAdjusted = min(adjusted),
+                  maxAdjusted = max(adjusted),
+                  scaledAdjusted = (adjusted - minAdjusted)/(maxAdjusted - minAdjusted) )
+
+coins %>% ggplot(aes(x = date, y = scaledAdjusted, group = symbol, color = symbol)) +
+  geom_line() +
+  scale_x_date(breaks = scales::pretty_breaks(n=10)) +
+  labs(x = 'Time', y = 'Scaled adjusted price') +
+  theme_bw(base_size = 8) + theme(legend.position = 'top')
+```
+
+**Question:** What insights can you get from this chart?
+
+```{r transformations2, echo=FALSE, out.height='2in'}
+coins %>% ggplot(aes(x = date, y = growthRate, group = symbol, color = symbol)) +
+  geom_line() +
+  scale_x_date(breaks = scales::pretty_breaks(n=10)) +
+  labs(x = 'Time', y = 'Day-Over-Day % Growth') +
+  theme_bw(base_size = 8) + theme(legend.position = 'top')
+
+```
+
+**Question:** What insights can you get from this chart?
+
+# Measures of Forecast Accuracy
+
+### Recap: Definition of Forecast
+
+\begin{figure}
+  \centering
+  \href{https://tinyurl.com/y5h5k4aj}{\includegraphics[width=0.9\textwidth, height = 0.7\textheight, frame, keepaspectratio]{Figures/forecastDef.png}}
+  \caption{The definition of the term "forecast" as obtained from Bing/Merriam-Webster.}
+\end{figure}
+
+
+### A Naive Forecast
+
+- A naïve forecast for an observation, $Y_t$ , is the observation prior, $Y_{t-1}$.  
+
+- For some types of time series (e.g. Random Walks), a naïve forecast is
+the best possible forecast one can make\footnotemark.
+
+- In the case of seasonal data, a naïve forecast could be the observation
+from the prior period.   
+  - For example, in the case of monthly data, the naïve forecast for the observation $Y_{Jan 2018}$ could be $Y_{Jan 2017}$. In this case, we would denote the frequency, m=12, and the naïve forecast for $Y_t$ is the observation $m$ periods prior, or $Y_{t-m}$.
+
+\footnotetext{Slide is from \href{https://miamioh.edu/fsb/directory/?up=/directory/farmerl2}{Dr. Allison Jones-Farmer's} lecture notes, Miami University, Spring 2020.}
+
+
+### Measures of Forecast Accuracy
+
+The measures of accuracy we will discuss all deal with the difference
+between the actual observed value ($Y_t$) and the forecasted value ($F_t$) at
+time $t$. In order to measure forecast accuracy, we assume we have $m$ actual
+values available, thus we have $Y_{t+1}, \, Y_{t+2}, \, \dots, \, Y_{t+m}$ and forecasts $F_{t+1}, \, F_{t+2}, \, \dots, \, F_{t+m}$. This is important because we will be averaging the forecast errors over $m$.\footnotemark
+
+\footnotetext{Note that your textbook discusses rolling forecast origins. This is important, but we will save this discussion for later in the semester. For now, assume the forecast origin is fixed (i.e., we are only interested in the one-period ahead forecast).}
+
+
+**Forecast Error:** 
+\begin{equation}
+  e_{t+i} = Y_{t+i} - F_{t+i}.
+\end{equation}
+
+### Measures Reflecting "Average" Forecast Performance
+
+**Mean Error:** 
+\begin{equation}
+  ME = \frac{\sum_{i=1}^{m} e_{t+i}}{m}.
+\end{equation}
+
+**Mean Percentage Error:** 
+\begin{equation}
+MPE = \frac{100}{m}\sum_{i=1}^{m}\frac{ e_{t+i}}{Y_{t+i}}.
+\end{equation}
+
+
+### Computing Measures of "Average" Forecast Performance
+
+```{r meanError, echo=FALSE, results="asis"}
+pacman::p_load(tidyquant, magrittr)
+cardano = tq_get("ADA-USD", from = "2021-01-31", to = "2021-02-06") %>% 
+  select(symbol, date, adjusted)
+cardano %<>% mutate(naiveFC = lag(adjusted),
+                 e = adjusted - naiveFC,
+                 PE = 100*e/adjusted)
+cardano$date %<>%  as.character()
+print(xtable(cardano , align = c(rep('c', 7))), comment = FALSE, size = '\\scriptsize', include.rownames=FALSE)
+cat(paste0("The ME and MPE are equal to ", mean(cardano$e, na.rm = T) %>% round(2), " and ", mean(cardano$PE, na.rm = T) %>% round(2),
+           "% , respectively."))
+```
+
+**Comments:**     
+
+  - We are forecasting the adjusted/closing price of the $ADA stock. Given that this crypto, trading is 24/7 (i.e., the **next trading day always equals the next day**).    
+  - The naïve forcast is the `lag(1)` of the series; thus, the forecast error is the `diff(1)`.  
+  - A **seasonal naive forecast** can be computed using `lag(m)` or the `snaive()` from the [fpp2 package](https://cran.r-project.org/web/packages/fpp2/fpp2.pdf).  
+
+
+### Measures Reflecting "Variablity" in Forecast Performance
+
+**Absolute Forecast Error:** 
+\begin{equation}
+  |e_{t+i}| = |Y_{t+i} - F_{t+i}|.
+\end{equation}
+
+**Squared Forecast Error:** 
+\begin{equation}
+  (e_{t+i})^2 = (Y_{t+i} - F_{t+i})^2.
+\end{equation}
+
+**Mean Absolute Error:** 
+\begin{equation}
+MAE = \frac{\sum_{i=1}^{m}|e_{t+i}|}{m}.
+\end{equation}
+
+
+**Root Mean Squared Error:** 
+\begin{equation}
+RMSE = \sqrt{\frac{\sum_{i=1}^{m}(e_{t+i})^2}{m}}.
+\end{equation}
+
+
+### Measures Reflecting "Relative" Forecast Performance
+
+**Mean Absolute Percentage Error:** 
+\begin{equation}
+MAPE = \frac{100}{m} \sum_{i=1}^{m} \frac{|e_{t+i}|}{m}.
+\end{equation}
+
+**Relative Mean Absolute Error:**
+\begin{equation}
+RelMAE = \frac{\sum_{i=1}^{m}|e_{t+i}|}{\sum_{i=1}^{m} |Y_{t+i} - Y_{t+i-1}|}.
+\end{equation}
+
+**Thiel's U:**
+\begin{equation}
+U = \sqrt{ \frac{\sum_{i=1}^{m}(e_{t+i})^2}{\sum_{i=1}^{m} (Y_{t+i} - Y_{t+i-1})^2} }.
+\end{equation}
+
+
+### An Overview of Computing these Measures in R {.allowframebreaks}
+
+```{r computations1}
+pacman::p_load(tidyquant, magrittr, fpp2, xtable)
+
+cardano = tq_get("ADA-USD", from = "2021-01-31", to = "2021-02-06") %>% 
+  select(symbol, date, adjusted)
+cardano %<>% mutate(naiveFC = lag(adjusted))
+
+e = cardano$adjusted - cardano$naiveFC
+ME = mean(e, na.rm=T)
+RMSE = mean(e^2, na.rm=T) %>% sqrt()
+MAE = abs(e) %>% mean(na.rm=T)
+MPE = 100 * mean(e/cardano$adjusted, na.rm=T)
+MAPE= 100 * mean(abs(e)/cardano$adjusted, na.rm=T)
+```
+
+
+```{r computations2}
+E = c(ME, RMSE, MAE, MPE, MAPE)
+names(E) = c("ME", "RMSE", "MAE", "MPE", "MAPE")
+round(E, 2) %>% print()
+
+# Alternatively, we could have just computed it using the fpp2 package
+accuracy(object = cardano$naiveFC, # forecast object is the first argument
+         cardano$adjusted) %>% round(2)
+```
+
+
+# Prediction Intervals
+
+### Point vs Interval Forecasts
+
+- **Point Forecasts:** future observations for which we report a single forecast observation.  
+
+- **Interval Forecast:** a range of values that are reported to forecast an outcome.
+
+
+If we assume the forecast errors follow a Normal Distribution, an approximate $100(1-\alpha)$ prediction interval can be computed as follows:  
+\begin{equation}
+  \hat{F}_t \pm Z*RMSE,
+\end{equation}
+where:  
+
+- $\hat{F}_t$ forecast at time $t$.  
+- The RMSE can be used as an estimate of the standard deviation of the forecast errors.  
+- $Z$ is the quantile corresponding to $100(1-\frac{\alpha}{2})$.
+
+
+### Recall: Standard Normal Distribution [1]
+
+```{r normPlot, echo=FALSE}
+x = seq(-3.75,3.75,0.001)
+dist = dnorm(x)
+probs = seq(0, 1, 0.001)
+ggplot(data.frame(x = x, d = dist),
+       aes(x = x, y = d)) + geom_line() + theme_bw() +
+  labs(title = "Standard Normal Density Function",
+       x = "Z", y = "Density")
+```
+
+### Recall: Standard Normal Distribution [2]
+
+```{r normPlot2, echo=FALSE}
+probValue = 0.975 # corresponds to 1 - (alpha/2)
+
+# Generating the inverse CDF of Standard Normal Dist.
+p = ggplot(data.frame(x = probs, inverseCDF = qnorm(probs)),
+       aes(x = x, y = inverseCDF)) + geom_line() + theme_bw() +
+  labs(title = "Quantile / inverse CDF of Standard Normal Dist.",
+       y = "Z", x = "Probability") +
+  geom_vline(xintercept = probValue, color = "red", size = 1.15) +
+  geom_hline(yintercept = qnorm(probValue), color = "red", size = 1.15)
+
+p + 
+  annotate("text", x = 0.64, y = 2.3, 
+           label = paste0("Z value is approximately", round(qnorm(probValue), digits = 2), " for prob = ", probValue),
+           color = "red")
+```
+
+
+### Prediction Intervals for the $ADA Data {.allowframebreaks}
+
+```{r pIs}
+naiveFC = cardano$naiveFC
+PInormU = naiveFC + abs(qnorm(0.975))*RMSE
+PInormL = naiveFC - abs(qnorm(0.975))*RMSE
+dfNaive = data.frame(date = cardano$date, Ft = naiveFC, PInormU, PInormL)
+dfNaive %>% ggplot(aes(x= date, y = naiveFC)) + geom_line() +
+  theme_bw() + labs(title ="Overlaying 95% PIs in ggplot", fill = "95% PI") +
+    geom_ribbon(aes(ymin = PInormL , ymax = PInormU, fill = "band"), 
+              alpha = 0.2, color = "red") + theme(legend.position= "bottom")
+```
+
+
+
+
+# Recap
+
+### Summary of Main Points
+
+\begin{block}{\textbf{Main Learning Outcomes}}
+  \begin{itemize}
+			\item \textbf{Apply transformations to a time series.}
+			\item \textbf{Apply and interpret measures of forecast accuracy.}
+			\item \textbf{Interpret prediction intervals for a simple forecast.}
+	\end{itemize}
+\end{block}
+
+
+### Things to Do
+
+ - **Recommended:** Thoroughly read Chapter 2 of our book.  
+ 
+ - Go through the slides, examples and make sure you have a good understanding of what we have covered.  
+ - **Potential Practice Problems:**   
+  
+    - Extract data using either the `tq_get()` ([tidyquant package](https://business-science.github.io/tidyquant/)) or the `covid19()` ([COVID19 package](https://covid19datahub.io/)), and compute the transformations using a manual (i.e., Excel) approach and R. Then, interpret the obtained transformed series.   
+    - Recreate the charts in Slides 39-41 in [04-Basic-Tools-for-Time-Series-Analysis.pdf](https://miamioh.instructure.com/courses/142177/files/18997183?module_item_id=2905745)
+    - **Textbook Example:** For the Means approaches in Example 2.7 (P.49), use R to compute the 7 error forecasting metrics (data available [here](https://www.wessexlearning.org/pobf2e/index.html)).    
+    - **Textbook Exercise 2.12:** Compute the forecast errors for the naive forecast.
+
+ - **Required:** Complete the [graded assignment](https://miamioh.instructure.com/courses/142177/quizzes/368939).
+ 
+
+### Graded Assignment 05: Evaluating your Understanding
+
+Please go to \href{https://miamioh.instructure.com/courses/142177/quizzes/368939}{Canvas (click here)} and answer the five questions. **Due February 11, 2021 [11:59 PM, Ohio local time].** 
+
+**What/Why/Prep?** The purpose of this assignment is to evaluate your understanding and retention of the material covered up to the end of Class 05. To reinforce your understanding of the covered material, I also suggest reading all of Chapter 2 of the book.
+
+**General Guidelines:**  
+
+\vspace{-0.5\baselineskip}
+
+  - Individual assignment.  
+  - This is **NOT** a timed assignment.    
+  - Proctorio is NOT required for this assignment.  
+  - You will need to have R installed (or accessible through the \href{https://virtualpc.fsb.miamioh.edu/RDWeb/Pages/en-US/default.aspx}{Remote Desktop})
+
+
+---
+
+\maketitle

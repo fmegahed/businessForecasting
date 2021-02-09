@@ -1,0 +1,169 @@
+---
+title: "ISA 444: Business Forecasting"
+subtitle: "05 - Basic Tools for Time Series Analysis"
+author: Fadel M. Megahed
+date: "February 08, 2021"
+runtime: shiny
+output: 
+  html_document:
+    toc: TRUE
+    toc_float: TRUE
+    number_sections: TRUE
+    theme: spacelab
+    paged_df: TRUE
+    code_folding: show
+    code_download: TRUE
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE,
+                      cache = FALSE,
+                      progress = FALSE, 
+                      verbose = FALSE,
+                      dpi = 600,
+                      dev = 'png',
+                      out.width = '100%')
+```
+
+# Required Packages
+In this section, we will include all the packages used in our analysis. In class, we will add to the packages listed in this template document. As we have done throughout the semester, we will use the [pacman package](https://cran.r-project.org/web/packages/pacman/pacman.pdf) to load (and install if needed) any of the packages. For students who continue to have issues with package installation, I would suggest:  
+
+  - Use R on the FSB virtual Desktop  
+  - Try installing the packages with the [pak package](https://github.com/r-lib/pak), which will consist of the following steps:  
+    - Step 1: Install the pak package, which can be done using either `pacman::p_load(pax)` or `install.packages('pak')`.  
+    - Step 2: Use the `pak::pkg_install("usethis") # package name of interest in quotes` to install the package that you need.  
+    - Step 3: Once you installed all the packages, you can use `pacman::p_load()` to load them
+
+```{r packages}
+if(require(pacman) == FALSE) install.packages('pacman') # check and install pacman if needed
+pacman::p_load(tidyverse, # load the tidyverse package for ggplot2 and dplyr functions
+               scales, # we sometimes use this for pretty_breaks() or the commas() with ggplot2
+               magrittr, # for pipe based operators
+               lubridate, # we use this to fix dates,
+               fpp2, # for measures of forecast accuracy
+               tidyquant) # we use tidyquant to get stocks and economic data
+
+# if you cannot install tidyquant, you should remove it from line 45, remove the comma in line 44 and
+# ensure that the # comment is after the )
+if(require(tidyquant)==FALSE) source('https://raw.githubusercontent.com/fmegahed/businessForecasting/master/custom_functions/tq_get.R')
+
+```
+
+---
+
+# Transformations (Continued from Last Class)
+
+## Guidelines for Transforming Time Series Data
+
+```{r transformationFramework}
+knitr::include_graphics('https://github.com/fmegahed/businessForecasting/raw/master/lectures/05%20-%20Basic%20Tools%20for%20Time%20Series%20Analysis/Figures/classificationTransformationTechniques.png')
+
+```
+
+## Differencing
+The change in the time series from one period to the next is known as the (first) difference.   
+
+  - Mathematically speaking, it can be computed as follows:  $DYt = Yt − Yt−1$  
+  - In R, it can be computed through:  
+    - Lag the time-series, and then subtract the lag from $Y_t$; or   
+    - Using the `diff()` from base R. 
+  - **Note that you should choose a $lag \ne 1$ if the time series exhibits a seasonal pattern.** In such a case, your lag should equal to the frequency of the time series.
+
+
+## Growth Rates
+Using what you have learned in class, please compute the growth rate for [questions 1 and 2 on Canvas](https://miamioh.instructure.com/courses/142177/quizzes/368225).
+
+
+## Log Transform
+To ensure that you have a good understanding of the log transformation, you are expected to replicate the charts in [Slides 39-41 of our Class 04 Notes](https://miamioh.instructure.com/courses/142177/files/18997183?module_item_id=2905745). 
+
+
+## A Walk through Statistical Transformations Using R
+In this live coding session, we will capitalize on the `mutate()` from [tidyverse](https://www.tidyverse.org/) to create transformations for multiple time series. Specifically, we will use the `tq_get()` from [tidyquant](https://business-science.github.io/tidyquant/) to extract data about the following cryptocurrencies (a) [Cardano](https://cardano.org/) (\$ADA), (b) [Chainlink](https://chain.link/) (\$LINK), and (c) [Zilliqa](https://www.zilliqa.com/) (\$ZIL). We will compute:  
+
+  - Growth Rates  
+  - Natural log
+  - Log Differences  
+  - $[0-1]$ Scaling  
+  
+Obviously, we will have to ensure that these transformations are computed for each coin separately. For the purpose of this activity, let us extract the data from 2020-11-01 to 2021-02-06.  
+
+```{r transformations}
+coins = tq_get(c('ADA-USD', 'LINK-USD', 'ZIL-USD'), from = '2020-11-01', to ='2021-02-06')
+```
+
+---
+
+# Measures of Forecast Accuracy
+
+## Computing Measures of “Average” Forecast Performance
+To illustrate the concepts discussed in [Slides 20-23](https://miamioh.instructure.com/courses/142177/files/19057658?module_item_id=2911974), let us generate a naive forecast for the `ADA-USD` series. 
+
+```{r cardanoNaiveFC}
+cardano = tq_get("ADA-USD", from = "2021-01-31", to = "2021-02-06")
+```
+
+---
+
+# Prediction Intervals
+
+## Point vs Interval Forecasts
+
+- **Point Forecasts:** future observations for which we report a single forecast observation.  
+
+- **Interval Forecast:** a range of values that are reported to forecast an outcome.
+
+
+If we assume the forecast errors follow a Normal Distribution, an approximate $100(1-\alpha)$ prediction interval can be computed as follows:  
+\begin{equation}
+  \hat{F}_t \pm Z*RMSE,
+\end{equation}
+where:  
+
+- $\hat{F}_t$ forecast at time $t$.  
+- The RMSE can be used as an estimate of the standard deviation of the forecast errors.  
+- $Z$ is the quantile corresponding to $100(1-\frac{\alpha}{2})$.
+
+
+## Recall: Standard Normal Distribution
+In the code chunk below, I provide you with the code that I used for generating the two charts in slides 31-32. Note that I would not ask you to generate these two charts in any of the assignments; however, I am providing the code below since it allows you to play with both charts in case you wanted to have additional insights/intuition about the charts (e.g., change the `probValue = 0.975` to other probabilities and see how the chart changes)
+
+```{r normPlots, echo=FALSE}
+x = seq(-3.75,3.75,0.001)
+dist = dnorm(x)
+probs = seq(0, 1, 0.001)
+
+selectInput("probValue", label = "1 - (alpha/2)",
+              choices = c(0.9, 0.95, 0.975, 0.995), selected = 0.975)
+
+# Generating the standard normal density function plot
+renderPlot({
+  ggplot(data.frame(x = x, d = dist),
+         aes(x = x, y = d)) + geom_line() + theme_bw() +
+  labs(title = "Standard Normal Density Function",
+       x = "Z", y = "Density") + 
+    geom_vline(xintercept = qnorm(as.numeric(input$probValue)), color = "red", size = 1.15) +
+    geom_vline(xintercept = -qnorm(as.numeric(input$probValue)), color = "red", size = 1.15) +
+    annotate("text", x = 0, y = 0.05, 
+             label = paste0('The actual ', 1 - 2*(1-as.numeric(input$probValue)), ' probability is between both red lines' ), color = 'red')
+})
+
+# Generating the inverse CDF of Standard Normal Dist.
+renderPlot({
+  ggplot(data.frame(x = probs, inverseCDF = qnorm(probs)),
+       aes(x = x, y = inverseCDF)) + geom_line() + theme_bw() +
+  labs(title = "Quantile / inverse CDF of Standard Normal Dist.",
+       y = "Z", x = "Probability") +
+  geom_vline(xintercept = as.numeric(input$probValue), color = "red", size = 1.15) +
+  geom_hline(yintercept = qnorm(as.numeric(input$probValue)), color = "red", size = 1.15) + 
+    annotate("text", x = 0.64, y = 2.3, 
+             label = paste0("Z value is approximately", qnorm(as.numeric(input$probValue)),
+                            " for prob = ", round(as.numeric(input$probValue), digits = 2)),
+             color = "red")
+})
+```
+
+
+---
