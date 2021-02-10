@@ -1,0 +1,93 @@
+---
+title: "ISA 444: Business Forecasting"
+subtitle: "06 - Non-Seasonal Smoothing"
+author: Fadel M. Megahed
+date: "February 10, 2021"
+output: 
+  html_document:
+    toc: TRUE
+    toc_float: TRUE
+    number_sections: TRUE
+    theme: spacelab
+    paged_df: TRUE
+    code_folding: show
+    code_download: TRUE
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE,
+                      cache = FALSE,
+                      progress = FALSE, 
+                      verbose = FALSE,
+                      dpi = 600,
+                      dev = 'png',
+                      out.width = '100%')
+```
+
+# Required Packages
+In this section, we will include all the packages used in our analysis. In class, we will add to the packages listed in this template document. As we have done throughout the semester, we will use the [pacman package](https://cran.r-project.org/web/packages/pacman/pacman.pdf) to load (and install if needed) any of the packages. For students who continue to have issues with package installation, I would suggest:  
+
+  - Use R on the FSB virtual Desktop  
+  - Try installing the packages with the [pak package](https://github.com/r-lib/pak), which will consist of the following steps:  
+    - Step 1: Install the pak package, which can be done using either `pacman::p_load(pax)` or `install.packages('pak')`.  
+    - Step 2: Use the `pak::pkg_install("usethis") # package name of interest in quotes` to install the package that you need.  
+    - Step 3: Once you installed all the packages, you can use `pacman::p_load()` to load them
+
+```{r packages}
+if(require(pacman) == FALSE) install.packages('pacman') # check and install pacman if needed
+pacman::p_load(tidyverse, # load the tidyverse package for ggplot2 and dplyr functions
+               scales, # we sometimes use this for pretty_breaks() or the commas() with ggplot2
+               magrittr, # for pipe based operators
+               lubridate, # we use this to fix dates,
+               fpp2, # for measures of forecast accuracy
+               tidyquant) # we use tidyquant to get stocks and economic data
+
+# if you cannot install tidyquant, you should remove it from line 46, remove the comma in line 45 and
+# ensure that the # comment is after the )
+if(require(tidyquant)==FALSE) source('https://raw.githubusercontent.com/fmegahed/businessForecasting/master/custom_functions/tq_get.R')
+
+```
+
+---
+
+# Smoothing Techniques
+
+## Overall Average
+
+If you have a series that stays pretty constant over time, you could just use the overall average for smoothing/forecasting. In R, we can use the `meanf()` from [fpp2](https://cran.r-project.org/web/packages/fpp2/index.html) to smooth and forecast using the overall mean.
+
+```{r overallAvg}
+usdt = tq_get('USDT-USD', from = Sys.Date()-90, to = Sys.Date() - 1) %>% select(date, adjusted) 
+
+# Custom function that will be used in "hacking" the x-axis tick labels
+properDates = function(x) {format(lubridate::date_decimal(x), "%b %d")}
+
+```
+
+---
+
+# Forecasting
+
+## Evaluation of the Performance of Cumulative Average, MA3 and MA7 on the USDT Dataset
+
+```{r evaluation}
+usdt = tq_get('USDT-USD', from = Sys.Date()-90, to = Sys.Date() - 1) %>% select(date, adjusted) 
+
+```
+
+
+## Plotting of the best Model
+
+```{r bestModelPlot}
+
+
+```
+
+
+
+
+
+
+---

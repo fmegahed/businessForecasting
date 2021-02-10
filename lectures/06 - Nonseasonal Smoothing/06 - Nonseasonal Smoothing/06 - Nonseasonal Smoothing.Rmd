@@ -105,7 +105,7 @@ In class, we have categorized measures of forecast accuracy into measures reflec
   (c) "relative" forecast error (e.g., MAPE).  
   
 ```{r forecastAccuracy1, echo=FALSE, results='asis'}
-pacman::p_load(tidyquant, magrittr, fpp2, xtable, timetk, lubridate, scales, crayon)
+pacman::p_load(tidyquant, magrittr, fpp2, xtable, lubridate, scales)
 
 cardano = tq_get("ADA-USD", from = '2021-02-01', to = '2021-02-08') %>% 
   select(symbol, date, adjusted)
@@ -144,8 +144,8 @@ cardanoTS = ts(cardano$adjusted, start = c(2021, yday(cardano$date[1])), frequen
 cardanoForecast = naive(cardanoTS, level = c(95), h =5)
 
 cardanoDF = data.frame(date = ymd(cardano$date), price = cardano$adjusted, low = NA, high = NA)
-cardanoPred = data.frame(date = cardanoForecast$mean %>% tk_index() %>% date_decimal() %>%
-                           date() %>% as.character() %>% ymd(),
+cardanoPred = data.frame(date = cardanoForecast$mean %>% index() %>% date_decimal() %>%
+                           as_date() + 1,
                          price = as.numeric(cardanoForecast$mean), 
                          low = as.numeric(cardanoForecast$lower), 
                          high = as.numeric(cardanoForecast$upper))
@@ -290,9 +290,9 @@ The remainder of this course focuses on Quantitative Forecasting
 
 - Causal methods use data from **sources other than the series being predicted**.
 
-- If $Y$ is the phenomenon to forecast and $X_1, \, X2, \, \dots, \, X_n$ are the $n$ variables we believe to be related to $Y$, then a causal model is one in which the forecast for $Y$ is some function of these variables:  $Y = f(X_1, \, X2, \, \dots, \, X_n)$.  
+- If $Y$ is the phenomenon to forecast and $X_1, \, X_2, \, \dots, \, X_n$ are the $n$ variables we believe to be related to $Y$, then a causal model is one in which the forecast for $Y$ is some function of these variables:  $Y = f(X_1, \, X_2, \, \dots, \, X_n)$.  
 
-- Econometric models are causal models in which the relationship between $Y$ and $X_1, \, X2, \, \dots, \, X_n$ is linear.  That is:
+- Econometric models are causal models in which the relationship between $Y$ and $X_1, \, X_2, \, \dots, \, X_n$ is linear.  That is:
 \begin{equation}
     Y = a_o + a_1X_1 + a_2X_2 + \dots +  a_nX_n
 \end{equation}
@@ -401,7 +401,7 @@ assets %>% filter(symbol == 'USDT-USD') %>%
                    .interactive = FALSE) + theme_bw(base_size = 8)
 ```
 
-```{r usdtPred, echo=FALSE}
+```{r usdtPred, echo=FALSE, fig.width=5.5}
 pacman::p_load(tidyverse, tidyquant, timetk, fpp2, lubridate)
 
 usdt = tq_get('USDT-USD', from = Sys.Date()-90, to = Sys.Date() - 1) %>% 
@@ -411,9 +411,8 @@ usdt_ts = ts(usdt$adjusted, start = c(2020, yday(min(usdt$date))), frequency = 3
 
 fit = meanf(usdt_ts, h = 10, level = 95) # fit model
 
-properDates <- function(x) {format(lubridate::date_decimal(x), "%m-%d-%y")}
-
-autoplot(fit) + autolayer(fitted(fit), series = 'fitted') + theme_bw() + 
+properDates = function(x) {format(lubridate::date_decimal(x), "%b %d")}
+autoplot(fit) + autolayer(fitted(fit), series = 'fitted') + theme_bw(base_size = 8) + 
   theme(legend.position = 'none') +
   scale_x_continuous(labels = properDates) +
   labs(x = 'Date', y = 'Closing Price')
@@ -437,7 +436,7 @@ usdt_SMOOTH = usdt %>%  mutate(cuMean = cummean(adjusted),
 RMSE = accuracy(object = usdt_SMOOTH$cuMean,
                 x = usdt_SMOOTH$adjusted) %>% .[1, 'RMSE']
 
-futureData = data.frame(date = future_frame(usdt_SMOOTH, .date_var = date, .length_out = 10) %>% pull(date),
+futureData = data.frame(date = seq.Date(from = ymd(max(usdt$date) + 1), by=1, length.out = 10),
                         adjusted = usdt_SMOOTH$cuMean[nrow(usdt)],
                         cuMean = usdt_SMOOTH$cuMean[nrow(usdt)],
                         lower = usdt_SMOOTH$cuMean[nrow(usdt_SMOOTH)] - (qnorm(0.975)*RMSE),
