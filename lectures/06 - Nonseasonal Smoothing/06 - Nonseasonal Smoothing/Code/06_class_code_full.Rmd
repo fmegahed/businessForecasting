@@ -58,6 +58,8 @@ if(require(tidyquant)==FALSE) source('https://raw.githubusercontent.com/fmegahed
 
 If you have a series that stays pretty constant over time, you could just use the overall average for smoothing/forecasting. In R, we can use the `meanf()` from [fpp2](https://cran.r-project.org/web/packages/fpp2/index.html) to smooth and forecast using the overall mean.
 
+**We will discuss the plotting of the overall average at the beginning of next class**
+
 ```{r overallAvg}
 usdt = tq_get('USDT-USD', from = Sys.Date()-90, to = Sys.Date() - 1) %>% select(date, adjusted) 
 
@@ -73,13 +75,29 @@ properDates = function(x) {format(lubridate::date_decimal(x), "%b %d")}
 ## Evaluation of the Performance of Cumulative Average, MA3 and MA7 on the USDT Dataset
 
 ```{r evaluation}
-usdt = tq_get('USDT-USD', from = Sys.Date()-90, to = Sys.Date() - 1) %>% select(date, adjusted) 
+usdt = tq_get('USDT-USD', from = Sys.Date()-90, to = Sys.Date() - 1) %>% select(date, adjusted)
 
+usdt_comp = usdt %>% mutate(cAVG = cummean(adjusted), # fn from dplyr
+                            ma3 = rollmeanr(adjusted, k = 3, na.pad = TRUE), # fn from zoo (loaded with tidyquant)
+                            ma7 = rollmeanr(adjusted, k =7, na.pad = TRUE), # fn from zoo (loaded with tidyquant)
+                            fcAVG = lag(cAVG), # base R fimcyopm
+                            fma3 = lag(ma3),
+                            fma7 = lag(ma7))
+
+# The accuracy function is from forecast (which gets loaded with the fpp2 package)
+# rbind just binds the rows (i.e. puts the results on top of each other)
+results = rbind(accuracy(object = usdt_comp$fcAVG, x = usdt_comp$adjusted), # forecast metrics for cumulative AVG
+                accuracy(object = usdt_comp$fma3, x = usdt_comp$adjusted),
+                accuracy(object = usdt_comp$fma7, x = usdt_comp$adjusted))
+row.names(results) = c('Cumulative AVG', 'MA3', 'MA7')
+
+round(results, digits = 6)
 ```
 
 
 ## Plotting of the best Model
 
+**We will discuss this at the beginning of next class**
 ```{r bestModelPlot}
 
 
