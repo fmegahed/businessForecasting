@@ -1,0 +1,629 @@
+---
+title: "ISA 444: Business Forecasting"
+subtitle: "07 - Nonseasonal Smoothing (Cont.)"
+author: Fadel M. Megahed
+date: 'Spring 2021'
+output:
+  beamer_presentation:
+    number_sections: false
+    toc: false
+    slide_level: 3
+    includes: 
+      in_header: structure.txt
+classoption: "aspectratio=169"
+always_allow_html: yes
+bibliography: refs.bib
+link-citations: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE,
+                      verbose = FALSE,
+                      progress = FALSE,
+                      fig.align = "center",
+                      fig.pos = 'p',
+                      fig.width = 5.95,
+                      fig.height= 2.5,
+                      allowframebreaks = TRUE,
+                      fig.margin=TRUE,
+                      kable.force.latex = TRUE,
+                      cache = FALSE)
+options(kableExtra.latex.load_packages = FALSE)
+pacman::p_load(kableExtra, xtable, tidyverse, magrittr)
+```
+
+# Preface
+
+### What we Covered Last Week
+
+\begin{block}{\textbf{Main Learning Outcomes}}
+			$\quad$ \textcolor{darkgreen}{\large \checkboxFadel} \textbf{Apply transformations to a time series.} \\
+			$\quad$ \textcolor{darkgreen}{\large \checkboxFadel} \textbf{Apply and interpret measures of forecast accuracy.} \\
+			$\quad$ \textcolor{darkgreen}{\large \checkboxFadel} \textbf{Interpret prediction intervals for a simple forecast.} \\
+			$\quad$ \textcolor{darkgreen}{\large \checkboxFadel} \textbf{Describe the benefits and drawbacks of judgmental and quantitative forecasing methods.} \\
+			$\quad$ \textcolor{darkgreen}{\large \checkboxFadel} \textbf{Explain the difference between causal and extrapolative forecasting.} \\
+			$\quad$ \textcolor{darkgreen}{\large \checkboxFadel} \textbf{Describe and apply smoothing/forecasting with a cumulative average.} \\
+			$\quad$ \textcolor{darkgreen}{\large \checkboxFadel} \textbf{Describe and apply forecasting with a moving average.}
+\end{block}
+
+
+### Recap: Guidelines for Transforming Time-Series Data
+
+\vspace{\baselineskip}
+
+\begin{figure}
+		\centering
+		\adjustbox{max width=\textwidth, frame}{%
+			\begin{forest}
+				[\Large{\textbf{Transformation Methods for Time Series}}
+				[\textbf{Stabilize the Mean}
+				[\textcolor{miamired}{\textbf{Differencing}}
+				[Eliminate/Reduce
+				[Seasonality]
+				[Trend]]
+				[Compute New Cases\footnotemark]]]
+				[\textbf{Stabilize the Variance}
+				[\textcolor{miamired}{\textbf{Power Transformations}}
+				[Log]
+				[Square Root]]] % stabilize the variance
+				[\textbf{$\sim$Stabilize both}
+				[\textcolor{miamired}{\textbf{Growth Rates}}]
+				[\textcolor{miamired}{\textbf{First diff of Log\footnotemark}}
+				[Exponential Growth TS
+				[$\ln$ to get a TS with a linear trend]
+				[Then diff to get a stationary series]
+				]]]
+				[\textbf{Rescale}
+				[\textcolor{miamired}{\textbf{($0-1$) Scaling\footnotemark}}]
+				[\textcolor{miamired}{\textbf{$z-$transform\footnotemark}}]
+				]
+				]
+		\end{forest}}
+		\caption{A classification of common transformation approaches for time series data.\footnotemark}
+	\end{figure}
+
+\vspace{-\baselineskip}
+
+\addtocounter{footnote}{-5}
+
+\stepcounter{footnote}\footnotetext{The \href{https://covid19datahub.io/}{COVID19 package} returns cumulative cases, i.e. a first difference $\longrightarrow$ new confirmed cases.}
+
+\stepcounter{footnote}\footnotetext{First difference of LOG $\approxeq$ percentage change. This is almost exact if the percentage change is small, but for larger percentage changes, it may differ greatly (see \href{https://faculty.fuqua.duke.edu/~rnau/Decision411_2007/411log.htm}{here for more details}).}
+
+\stepcounter{footnote}\footnotetext{Rescaling of the data from the original range so that all values are within the range of 0 and 1. Mathematically, speaking this can be achieved by calculating $y_t = \frac{x_t - \min}{\max - \min}$.}
+
+\stepcounter{footnote}\footnotetext{One can normalize a time-series by $z_t = \frac{x_t - \mu}{\sigma}$.}
+
+\stepcounter{footnote}\footnotetext{My (incomplete) attempt to provide you with a taxonomy for time series data transformations.}
+
+
+### Recap: A Note on Interpreting HW 05 Q2 Result
+
+Last week, I had two emails asking me about making sense of the [Q2 result in Assignment 05](https://miamioh.instructure.com/courses/142177/quizzes/368939). Recall the **question:** *Let us assume that we wanted to have a fairer comparison between the three countries. Therefore, you will scale the number of new cases by population. Report the scaled value for the US.* 
+
+```{r q2Solution, verbose = FALSE, results='hide'}
+pacman::p_load(tidyverse, magrittr, COVID19) # needed packages
+covid = covid19(country = c('EGY', 'IND', 'USA'), start = '2020-03-01', end = '2021-02-06') # extract data
+covid %>% select(id, date, confirmed, population) %>% 
+  mutate(newCases = confirmed - lag(confirmed), 
+         newCasesByPop = newCases/population) %>%
+  filter(date == '2021-01-21')
+```
+
+```{r q2SolutionShow, echo=FALSE, results='asis'}
+covid %>% select(id, date, confirmed, population) %>% 
+  mutate(date = as.character(date),
+         newCases = confirmed - lag(confirmed), 
+         newCasesByPop = round(newCases/population, digits = 4),
+         population = scales::comma(population),
+         confirmed = scales::comma(confirmed, accuracy = 1)) %>% 
+  mutate(newCases = scales::comma(newCases, accuracy = 1)) %>% 
+  filter(date == '2021-01-21') -> q2
+
+print(xtable(q2, align = c(rep('r', 7)), digits = c(rep(0, 6), 4)), comment = FALSE, size = '\\scriptsize', include.rownames=FALSE)
+```
+
+
+### Recap: Interpreting Measures of Forecast Accuracy
+
+In class, we have categorized measures of forecast accuracy into measures reflecting:   
+
+  (a) "average" forecast performance (e.g., mean error and mean percent error);  
+  (b) "variability" in forecast performance (e.g., AE, SE, MAE, and RMSE); and  
+  (c) "relative" forecast error (e.g., MAPE).  
+  
+```{r forecastAccuracy1, echo=FALSE, results='asis'}
+pacman::p_load(tidyquant, magrittr, fpp2, xtable, lubridate, scales)
+
+doge = tq_get("DOGE-USD", from = '2021-02-08', to = '2021-02-14') %>% 
+  select(symbol, date, adjusted)
+doge %<>% mutate( date = as.character(date), naiveFC = lag(adjusted),
+                     forecastError = adjusted - naiveFC)
+
+print(xtable(doge, align = c(rep('c', 5), 'r'), digits = c(0, 0, 0, 3, 3, 3)), 
+      comment = FALSE, size = '\\scriptsize', include.rownames=FALSE)
+```
+
+Based on the naive forecast, we can compute: \textcolor{miamired}{(How would you interpret these results?)}
+
+```{r forecastAccuracy2, echo=FALSE, results='asis'}
+predTable = accuracy(object = doge$naiveFC, # forecast object is the first argument
+         doge$adjusted)
+
+print(xtable(predTable, align = c(rep('c', 6)), digits = c(0, 4, 4, 4, 2, 2)),
+      comment = FALSE, size = '\\scriptsize', include.rownames=FALSE)
+```
+
+
+### Recap: Prediction Intervals
+- **Point Forecasts:** future observations for which we report a single forecast observation.  
+
+- **Interval Forecast:** a range of values that are reported to forecast an outcome.
+
+If we assume the forecast errors follow a Normal Distribution, an approximate $100(1-\alpha)$ prediction interval can be computed as follows: $\hat{F}_t \pm Z*RMSE$, where:  
+
+- $\hat{F}_t$ forecast at time $t$.  
+- The RMSE can be used as an estimate of the standard deviation of the forecast errors.  
+- $Z$ is the quantile corresponding to $100(1-\frac{\alpha}{2})$ (see [Section 4 of our interactive guide](http://rstudio.fsb.miamioh.edu:3838/megahefm/isa444/class05/) for more details)
+
+
+### Recap: A 10,000 Foot View of Forecasting Methods
+
+\vspace{\baselineskip}
+
+\begin{figure}
+		\centering
+		\adjustbox{max width=\textwidth, frame}{%
+			\begin{forest}
+				[\large{\textbf{Forecasting}}
+				[\textbf{Judgemental}
+				[Sales Composite]
+				[Customer Survey]
+				[Delphi Method]]
+				[\textbf{Quantitative}
+				[\textcolor{miamired}{\textbf{Extrapolative}}
+				[\textcolor{darkgreen}{\textbf{Naive}}]
+				[\textbf{Smoothing-based}
+				[\textcolor{darkgreen}{\textbf{$\approx$Stationary}}
+				[Average]
+				[MA]
+				[\textcolor{orange}{SES}]]
+				[\textcolor{darkgreen}{\textbf{Trend}}
+				[Holt's]]
+				[\textcolor{darkgreen}{\textbf{Both?}}
+				[Holt-Winters]
+				]]
+				[\textbf{``Advanced''}
+				[(S)ARIMA]
+				[GARCH]]]
+				[\textcolor{miamired}{\textbf{Causal}}
+				[\textbf{Statistical}
+				[(S)ARIMAX]]
+				[\textbf{ML-Based}
+				[\textcolor{darkgreen}{\textbf{Feature Eng.}}
+				[e.g. AutoML]]]
+				]
+				]
+				]
+		\end{forest}}
+		\caption{A 10,000 foot view of forecasting techniques\footnotemark}
+\end{figure}
+
+\footnotetext{An (incomplete) classification of forecasting techniques. Note that these focus on univariate time-series. Hence, they exclude popular approaches used in multivariate time series forecasting.}
+
+
+### Learning Objectives for Today's Class
+\begin{block}{\textbf{Main Learning Outcomes}}
+  \begin{itemize}
+			\item \textbf{Recognize time series that are appropriate for simple exponential smoothing (SES).}
+			\item \textbf{Use SES to smooth past observations of a time series.}
+			\item \textbf{Use SES to forecast future observations of a time series.}
+			\item \textbf{Compare the forecasting performance of SES to other suitable techniques (i.e., methods that require similar assumptions).}
+	\end{itemize}
+\end{block}
+
+
+# A Quick Tour of the Two Plots from Last Class
+
+
+### Smoothing with the Overall Average
+
+In this live coding session, let us recreate this chart building on the following code.
+```{r cumulativeAvg1}
+usdt = tidyquant::tq_get('USDT-USD', from = '2020-11-16', to = '2021-02-14') %>% 
+  dplyr::select(date, adjusted) 
+# Custom function that will be used in "hacking" the x-axis tick labels
+properDates = function(x) {format(lubridate::date_decimal(x), "%b %d")}
+```
+
+```{r cumulativeAvg2, echo=FALSE, fig.height=1.7}
+usdt_ts = ts(usdt$adjusted, start = c(2020, yday(min(usdt$date))), frequency = 365) 
+fit = meanf(usdt_ts, h = 10, level = 95) # fit model
+
+autoplot(fit) + 
+autolayer(fitted(fit), series = 'fitted') + theme_bw(base_size = 8) + 
+  theme(legend.position = 'none') + 
+  labs(x = 'Date', y = 'Closing Price', title = 'Forecasts from Cumulative Mean') +
+  scale_x_continuous(labels = properDates)
+```
+
+
+### Forecasting Using Cumulative Avg, MA3 and MA7 [1]
+```{r forecastRecap1}
+usdt = tq_get('USDT-USD', from = '2020-11-16', to = '2021-02-14') %>%
+  select(date, adjusted)
+
+usdt_comp = usdt %>% 
+  mutate(cAVG = cummean(adjusted), # fn from dplyr
+         ma3 = rollmeanr(adjusted, k = 3, na.pad = TRUE), # fn from zoo
+         ma7 = rollmeanr(adjusted, k =7, na.pad = TRUE), # fn from zoo
+         fcAVG = lag(cAVG), fma3 = lag(ma3), fma7 = lag(ma7) )
+
+results = rbind(accuracy(object = usdt_comp$fcAVG, x = usdt_comp$adjusted), # forecast metrics for cumulative AVG
+                accuracy(object = usdt_comp$fma3, x = usdt_comp$adjusted),
+                accuracy(object = usdt_comp$fma7, x = usdt_comp$adjusted) )
+
+row.names(results) = c('Cumulative AVG', 'MA3', 'MA7')
+```
+
+### Forecasting Using Cumulative Avg, MA3 and MA7 [2]
+
+```{r forecastRecap2, results='asis', echo=FALSE}
+print(xtable(results, align = c('l', rep('r', 5)), digits = c(0, rep(5, 5))),
+      comment = FALSE, size = '\\scriptsize', include.rownames=TRUE)
+```
+
+**Based on the results above, let us pick the approach with the smallest MAPE.**
+
+```{r forecastRecap3, echo=FALSE, fig.height=1.6}
+pacman::p_load(tidyquant, tidyverse, magrittr, fpp2, lubridate, scales)
+
+usdt = tq_get('USDT-USD', from = '2020-11-16', to = '2021-02-14') %>%
+  select(date, adjusted)
+
+usdt_comp = usdt %>% 
+  mutate(cAVG = cummean(adjusted), # fn from dplyr
+         ma3 = rollmeanr(adjusted, k = 3, na.pad = TRUE), # fn from zoo
+         ma7 = rollmeanr(adjusted, k =7, na.pad = TRUE), # fn from zoo
+         fcAVG = lag(cAVG), fma3 = lag(ma3), fma7 = lag(ma7) )
+
+usdt_comp %<>%  mutate(FC = fcAVG,  lower = NA,  upper = NA) # creating the three variables
+
+RMSE = accuracy(object = usdt_comp$FC, x = usdt_comp$adjusted) %>% .[1, 'RMSE'] # to automate the copying of the value
+
+usdtFuture = data.frame(date = seq.Date(from = ymd( max(usdt$date) + 1), by = 1, length.out = 10), # to avoid doing dates by hand
+                           adjusted = NA, # we do not have true values
+                           FC = usdt_comp$cAVG[nrow(usdt_comp)], # automatically get last value
+                           lower = usdt_comp$cAVG[nrow(usdt_comp)] - (qnorm(0.975)*RMSE), # lower 95% interval
+                           upper = usdt_comp$cAVG[nrow(usdt_comp)] + (qnorm(0.975)*RMSE)) # upper
+
+combined = rbind(usdt_comp %>% select(colnames(usdtFuture)), 
+                 usdtFuture) # combining them in one data frame
+
+combined %>% ggplot(aes(x = date, y = adjusted)) + geom_point() + geom_line() + # adding the original data
+  geom_line(aes(x = date, y = FC), color = 'red') + # adding a dashed red line for the forecasts
+  scale_x_date(breaks = pretty_breaks(12)) + # beautifying the x-axis
+  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.2) + # adding the PI box
+  labs(x = 'Dates',  y = 'Adjusted/Close Price', title = 'Best Smoother and Forecasting Method for Tether (USDT-USD)', # labels
+       caption = paste('Data Source: Yahoo Finance | Data from', usdt$date[1], 'to',  usdt$date[nrow(usdt)])) +  theme_bw(base_size = 8) # theme
+```
+
+# Simple Exponential Smoothing (SES)
+
+### Definition and Basic Principles
+
+Simple Exponential Smoothing (SES) is a method used for one-step-ahead forecasting of a time series when there is no trend or seasonal pattern, but the mean may drift slowly over time. The mean is said to have a "local level".
+
+Similar to the idea behind a moving average, SES averages the values of the times series, but applies weights of decreasing importance to values that are farther away from the forecast. The weights of the observations "exponentially decay" as we move away from them in time.
+
+The SES one-step-ahead forecast is given by:
+\begin{equation}
+  {l}_{t+1} = l_t + \alpha(y_t - l_t ) = \alpha y_t + (1 - \alpha)l_t,
+\end{equation}
+where $0 < \alpha < 1$ is the smoothing parameter, and $l_t$ is the  level of the series at time $t$. Note that $l_{1+1}$ is often denoted as $f_{t+1}$ since it represents our one step-ahead forecast for $t+1$.
+
+
+### Impact of the Smoothing Parameter: The Math
+
+Let us examine what goes into the computations for $l_4$:
+
+\begin{equation}
+  \begin{split}
+  \setbeamercovered{transparent}
+    l_4 &= \alpha y_3 + (1 - \alpha) l_3 \\
+        \onslide<2->{&= \alpha y_3 + (1 - \alpha) \color<2>{miamired}{[\alpha y_2 + (1 - \alpha)l_2]}} \\
+        \onslide<2->{&= \alpha y_3 + \color<2>{miamired}{\alpha(1 - \alpha)y_2 + (1 - \alpha)^2 l_2}} \\
+        \onslide<3->{&= \alpha y_3 + \alpha(1 - \alpha)y_2 + (1 - \alpha)^2 \color<3>{miamired}{[\alpha y_1 + (1 - \alpha)l_1]}} \\
+        \onslide<3->{&= \alpha y_3 + \alpha(1 - \alpha)y_2 + \color<3>{miamired}{\alpha(1 - \alpha)^2 y_1} + \color<3>{miamired}{(1 - \alpha)^3l_1}} \\
+        \onslide<4->{&= \alpha y_3 + \alpha(1 - \alpha)y_2 + \alpha(1 - \alpha)^2 y_1 + (1-\alpha)^3 \color<4>{miamired}{l_0}}
+  \end{split}
+\end{equation}
+
+\only<5>{\textbf{\textcolor{miamired}{Note that SES needs two parameters: (a) the smoothing paramater $\alpha$, and (b) the initial value for the level (i.e., $l_0$).} Note that we will use $l_0 = l_1 = y_1$. } }
+
+### Impact of the Smoothing Parameter: The Math (Cont.)
+
+For $l_{10}$, the weights of the observed values at $t$ are distributed as follows:
+
+```{r tableWeights, results='asis', echo=FALSE}
+
+df = data.frame(t= seq(9, 0, -1), `alpha = 0.2` = rep(NA, 10), `alpha = 0.5` = rep(NA, 10), `alpha = 0.8` = rep(NA, 10))
+
+for (i in 1:nrow(df) ) {
+  df$alpha...0.2[i] = 0.2*(1-0.2)^(i-1)
+  df$alpha...0.5[i] = 0.5*(1-0.5)^(i-1)
+  df$alpha...0.8[i] = 0.8*(1-0.8)^(i-1)
+}
+
+print(xtable(df, align = c(rep('c', 5)), digits = c(0, 0, 5, 5, 5) ), comment = FALSE,  
+      include.rownames=FALSE)
+```
+
+
+### Impact of the Smoothing Parameter: Visually
+
+```{r plotWeight, echo=FALSE}
+df = data.frame(t= seq(9, 0, -1), `alpha = 0.2` = rep(NA, 10), `alpha = 0.5` = rep(NA, 10), `alpha = 0.8` = rep(NA, 10))
+
+for (i in 1:nrow(df) ) {
+  df$alpha...0.2[i] = 0.2*(1-0.2)^(i-1)
+  df$alpha...0.5[i] = 0.5*(1-0.5)^(i-1)
+  df$alpha...0.8[i] = 0.8*(1-0.8)^(i-1)
+}
+
+df$lag = rev(df$t) + 1 
+
+df %<>% pivot_longer(c(2,3,4))
+
+df %>% ggplot(aes(x = as.integer(lag), y = value, group = name, color = name)) +
+  geom_line() + geom_point() + theme_bw() +
+  labs(x = 'Lag', y = 'Weight', title = 'Weights on Different Lags in SES', color = 'Smoothing Parameter') +
+  theme(legend.position = 'bottom') +
+  scale_x_continuous(breaks = scales::pretty_breaks()) +
+  scale_color_brewer(type = "qual", palette = 'Dark2')
+
+```
+
+
+
+### Example 1: Hand Calculations
+
+In the example below, I have read the `HSN1F` macroeconomic variable from [FRED](https://fred.stlouisfed.org/series/HSN1F) between 2020-01-01 and 2020-07-01. If you were to select $\alpha = 0.2$ and initialize $l_0 = 774$, please fill the last three columns in the table (by performing "manual computations"). 
+
+```{r HSN1F, echo=FALSE, results='asis'}
+hsn1f = read.csv("https://fred.stlouisfed.org/graph/fredgraph.csv?bgcolor=%23e1e9f0&chart_type=line&drp=0&fo=open%20sans&graph_bgcolor=%23ffffff&height=450&mode=fred&recession_bars=on&txtcolor=%23444444&ts=12&tts=12&width=1168&nt=0&thu=0&trc=0&show_legend=yes&show_axis_titles=yes&show_tooltip=yes&id=HSN1F&scale=left&cosd=2020-01-01&coed=2020-07-01&line_color=%234572a7&link_values=false&line_style=solid&mark_type=none&mw=3&lw=2&ost=-99999&oet=99999&mma=0&fml=a&fq=Monthly&fam=avg&fgst=lin&fgsnd=2020-02-01&line_index=1&transformation=lin&vintage_date=2020-09-16&revision_date=2020-09-16&nd=1963-01-01")
+hsn1f$`Forecast` = "..."
+hsn1f$`Forecast Error` = "..."
+print(xtable(hsn1f, align = c(rep('c', 5)), digits = c(0, 0, 0, 0, 0) ), comment = FALSE,  
+      include.rownames=FALSE)
+```
+
+
+### Example 1: Charting HSN1F & its SES (2016-01 to 2020-12)
+
+```{r HSN1Fplot, echo=FALSE}
+hsn1f = read.csv("https://fred.stlouisfed.org/graph/fredgraph.csv?bgcolor=%23e1e9f0&chart_type=line&drp=0&fo=open%20sans&graph_bgcolor=%23ffffff&height=450&mode=fred&recession_bars=on&txtcolor=%23444444&ts=12&tts=12&width=1168&nt=0&thu=0&trc=0&show_legend=yes&show_axis_titles=yes&show_tooltip=yes&id=HSN1F&scale=left&cosd=2016-01-01&coed=2020-12-01&line_color=%234572a7&link_values=false&line_style=solid&mark_type=none&mw=3&lw=2&ost=-99999&oet=99999&mma=0&fml=a&fq=Monthly&fam=avg&fgst=lin&fgsnd=2020-02-01&line_index=1&transformation=lin&vintage_date=2021-02-14&revision_date=2021-02-14&nd=1963-01-01")
+hsn1f$ses0.2 = forecast::ses(hsn1f$HSN1F, initial = 'simple', alpha = 0.2) %>% .[['fitted']]
+hsn1f$ses0.8 = forecast::ses(hsn1f$HSN1F, initial = 'simple', alpha = 0.8) %>% .[['fitted']]
+
+df = hsn1f %>%  pivot_longer(c(2,3,4))
+
+df %>% ggplot(aes(x = lubridate::ymd(DATE), y = value, group = name, color = name)) +
+  geom_line() +
+  theme_bw() +
+  labs(x = 'Date', y = 'Housing Starts', color = 'Legend') +
+  theme(legend.position = 'bottom') +
+  scale_x_date(breaks = scales::pretty_breaks(5)) +
+  scale_color_brewer(type = "qual", palette = 'Dark2')
+```
+
+
+### Example 2: Problem Definition
+
+In this example, we are using R to forecast sales mimicking Table 3.3 in our textbook. See P. 72. \textcolor{miamired}{Note the difference between the generated output here and that in the Table. If you wanted to exactly replicate that result, what minor edit to the R forecast is needed?}
+
+```{r table3-3, eval=FALSE}
+if(require(pacman)==FALSE) install.packages("pacman") # install pacman if not installed
+pacman::p_load(magrittr, tidyverse, fpp2, scales) # load (and install if needed) the required packages
+
+df = data.frame(time = 1:12, 
+                sales = c(5, 6, 7, 8, 7, 6, 5, 6, 7, 8, 7, 6))
+
+df %>% 
+  ggplot(aes(x= time, y = sales)) + # setting the canvas
+  geom_line() + geom_point() + # lines with dots highlighted
+  scale_x_continuous(breaks = pretty_breaks(12)) + # making x_axis pretty (from scales)
+  theme_bw() # using our typical black and white theme
+```
+
+### Example 2: Charting the Original Data
+
+```{r table3-3Cont1, echo=FALSE}
+if(require(pacman)==FALSE) install.packages("pacman") # install pacman if not installed
+pacman::p_load(magrittr, tidyverse, fpp2, scales) # load (and install if needed) the required packages
+
+df = data.frame(time = 1:12, 
+                sales = c(5, 6, 7, 8, 7, 6, 5, 6, 7, 8, 7, 6))
+
+df %>% 
+  ggplot(aes(x= time, y = sales)) + # setting canvas
+  geom_line() + geom_point() + # lines with dots highlighted
+  scale_x_continuous(breaks = pretty_breaks(12)) + # making x_axis pretty (from scales)
+  theme_bw() # using our typical black and white theme
+```
+
+### Example 2: Using R to Compute the SES
+```{r table3-3Cont2, out.height=1.8, results='asis'}
+sales_ts = ts(df$sales, start = 1, frequency = 1)
+sesRes = ses(sales_ts, initial = "simple", alpha = 0.3, h =3, level = 95)
+summary(sesRes) %>% xtable() %>% print()
+```
+
+
+### Example 2: Using R to Chart the Data, SES \& Forecast
+
+```{r autoplotExample2, echo=FALSE}
+autoplot(sesRes) + 
+  autolayer(fitted(sesRes), series = 'Simple Exponential Smoothing') +
+  theme_bw(base_size = 8) + scale_x_continuous(breaks = pretty_breaks(20)) +
+  labs(y = 'Sales', title = 'Forecasts from Simple Exponential Smoothing') +
+  theme(legend.position = 'bottom') +
+  guides(color=guide_legend(title="Series"))
+```
+
+
+### Example 2: Comparing SES with Other Smoothing Methods
+
+```{r autoplotExample2Comp, echo=FALSE}
+naiveFC = naive(sales_ts, h =3, level = 95)
+cAVG = meanf(sales_ts, h = 3, level = 95)
+
+autoplot(sesRes) + 
+  autolayer(fitted(sesRes), series = 'SES[0.3]') +
+  autolayer(fitted(cAVG), series = 'Overall Average') +
+    autolayer(fitted(naiveFC), series = 'Naive') +
+  theme_bw(base_size = 8) + scale_x_continuous(breaks = pretty_breaks(20)) +
+  labs(y = 'Sales', title = 'Comparison of Three Smoothing Techniques',
+       caption = 'The blue ribbon/region captures the 95% PI based on the SES Forecast') + 
+  theme(legend.position = 'bottom') +
+  guides(color=guide_legend(title="Series"),
+        fill=guide_legend(title="95% PI for SES"))
+```
+
+
+### Discussion Question
+
+**If you had to make a subjective choice for the value of the smoothing constant, what value would you choose for:**   
+
+  (a) **a product with long-term steady sales** and  
+  
+  (b) **a stock/cryptocurrency (e.g., AAPL, AMZN, BTC-USD, ADA-USD)?**
+
+
+### Training and Validation Samples {.allowframebreaks}
+
+**Often you determine your smoothing parameter based on a training or baseline sample of observations, not the entire series. Then you apply the model using the smoothing parameter to the new observations and evaluate the fit on the out-of-sample observations.**
+
+```{r rollingOrigin, fig.align='center', echo=FALSE, fig.height=1.7}
+usdt = tidyquant::tq_get('USDT-USD', from = '2020-11-16', to = '2021-02-14') %>% 
+  dplyr::select(date, adjusted)
+
+usdt %>% ggplot(aes(x = date, y = adjusted)) +
+  geom_line() + geom_point() +
+  scale_x_date(breaks = pretty_breaks(10)) + # beautifying the x-axis
+  geom_rect(xmin = usdt$date[1], xmax = usdt$date[70], 
+            ymin = min(usdt$adjusted) - 0.0005,
+            ymax = max(usdt$adjusted) + 0.0005, alpha = 0.005, fill = 'gray') +
+  geom_rect(xmin = usdt$date[71], xmax = usdt$date[91], 
+            ymin = min(usdt$adjusted) - 0.0005,
+            ymax = max(usdt$adjusted) + 0.0005, alpha = 0.005, fill = 'red') +
+  annotate("text", x = usdt$date[40], y = max(usdt$adjusted) + 0.0001,
+             color = 'black', label = "Training Region", size = 3, fontface = 'bold') + 
+  annotate("text", x = usdt$date[81], y = max(usdt$adjusted) + 0.0001,
+             color = 'black', label = "Validation Region", size = 3, fontface = 'bold') + 
+  theme_bw(base_size = 7) +
+  labs(x = 'Date', y = 'Closing Price', caption = 'Data from 2020-11-16 to  2021-02-14',
+       title = 'Depicting Training (~77%) and Validation (~23%) Regions for the USDT-USD Data')
+
+```
+
+  (1) Determine the size of the training, or baseline sample.\footnotemark  
+      (a) Training sample size is usually 70-80% of the total available data.  
+      (b) Training sample should maintain time order. With time series, the training sample usually consists of observations at the beginning of the sample, while validation sample consists of observations at the end of the available data.  
+      
+  (2) Select the smoothing parameter based on the observations in the training sample only.  
+  
+  (3) Evaluate the “in-sample” performance of the forecast using RMSE and graphs using the training sample.  
+  
+  (4) Apply the model chosen in #2 to the validation sample.  
+  
+  (5) Evaluate the “out-of-sample” performance of the forecast using RMSE and graphs.
+
+
+\footnotetext{Slide is based on \href{https://miamioh.edu/fsb/directory/?up=/directory/farmerl2}{Dr. Allison Jones-Farmer's Handouts} for ISA 444, Spring 2020.}
+
+
+
+### Optimizing the Smoothing Parameter: WFJ Sales Series
+To illustrate the aforementioned concepts, let us examine the data for the [WFJ Sales Example](https://github.com/fmegahed/businessForecasting/blob/master/assignments/WFJ_sales.xlsx?raw=true) (i.e., Example 3.2 in our textbook). Per the textbook example, we will use the first the 26 observations as the estimation sample.
+
+```{r wfjSales}
+pacman::p_load(readxl)
+download.file("https://github.com/fmegahed/businessForecasting/blob/master/assignments/WFJ_sales.xlsx?raw=true",
+              destfile = "Data/WFJ_sales.xlsx", mode = "wb")
+WFJ = read_excel("Data/WFJ_sales.xlsx") %>% select(c(1,2))
+```
+
+**This example will be coded live in class to obtain the results below.**
+
+
+```{r wfjSalesComplete, echo=FALSE, results='asis'}
+trainData = WFJ[1:26,] # using the first 26 observations for training
+ntrain = nrow(trainData) # getting the sample size
+
+sesResults = ses(trainData$`WFJ Sales`, h = 1)
+metrics = accuracy(sesResults)
+cat(paste0('The optimal alpha obtained using R is equal to ', round(sesResults$model$par['alpha'], 3), '.'), '\n')
+print(xtable(metrics, align = c(rep('c', 8)), digits = c(0, rep(3, 7)) ), comment = FALSE)
+```
+
+### The Validation Results
+**A continuation of the live coding session, where we: (a) examine the validation results; and (b) print the combined training and validation results in one table.**
+
+```{r wfjSalesComplete2, echo=FALSE, results='asis'}
+WFJ$sesOpt = ses(WFJ$`WFJ Sales`, h =1, initial = 'simple', alpha = 0.727) %>% .[['fitted']]
+validationData = WFJ[27:62,]
+validationMetrics = accuracy(object = validationData$sesOpt, x = validationData$`WFJ Sales`)
+
+combinedMetrics = rbind(metrics[1, -c(6,7)], validationMetrics)
+row.names(combinedMetrics) = c('Training Set', 'Validation Set')
+print(xtable(combinedMetrics, align = c(rep('c', 6)), digits = c(0, rep(3, 5)) ), comment = FALSE)
+```
+
+
+
+
+# Recap
+
+### Summary of Main Points
+
+\begin{block}{\textbf{Main Learning Outcomes}}
+  \begin{itemize}
+			\item \textbf{Recognize time series that are appropriate for simple exponential smoothing (SES).}
+			\item \textbf{Use SES to smooth past observations of a time series.}
+			\item \textbf{Use SES to forecast future observations of a time series.}
+			\item \textbf{Compare the forecasting performance of SES to other suitable techniques (i.e., methods that require similar assumptions).}
+	\end{itemize}
+\end{block}
+
+
+### Things to Do
+
+ - **Recommended:** Thoroughly read Chapter 3.1-3.3 of our book.  
+ 
+ - Go through the slides, examples and make sure you have a good understanding of what we have covered.  
+
+- **Required:** Complete the graded assignment (see details in next slide).
+ 
+
+### Graded Assignment 07: Evaluating your Understanding
+
+Please go to \href{https://miamioh.instructure.com/courses/142177/quizzes/370024}{Canvas (click here)} and answer the questions. **Due February 18, 2021 [11:59 AM, Ohio local time] | Will be available starting from 5PM (Feb 15, 2021)** 
+
+**What/Why/Prep?** The purpose of this assignment is to evaluate your understanding and retention of the material covered up to the end of Class 07. To reinforce your understanding of the covered material, I also suggest reading Chapter 3.1-3.3 of the book.
+
+**General Guidelines:**  
+
+\vspace{-0.5\baselineskip}
+
+  - Individual assignment.  
+  - This is **NOT** a timed assignment.    
+  - Proctorio is NOT required for this assignment.  
+  - You will need to have R installed (or accessible through the \href{https://virtualpc.fsb.miamioh.edu/RDWeb/Pages/en-US/default.aspx}{Remote Desktop})
+
+
+---
+
+\maketitle
