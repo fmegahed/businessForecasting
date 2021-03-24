@@ -1,0 +1,158 @@
+---
+title: "Exam 02 Solution"
+author: "Fadel M Megahed"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: 
+  html_document:
+    toc: TRUE
+    toc_float: TRUE
+    number_sections: TRUE
+    theme: simplex
+    paged_df: TRUE
+    code_folding: show
+    code_download: TRUE
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Loading the Required Packages {-}
+
+```{r packages}
+if(require(pacman)==FALSE) install.packages(pacman) #
+
+pacman::p_load(tidyverse, magrittr, fpp2, scales, tseries, ggpubr, tidyquant)
+
+```
+
+# Question 1
+We can conclude that the time-series of tweets is **stationary** since it hovers around 30 tweets (with no indication of an increasing pattern). Additionally, from the bottom panel, we do not have strong evidence for seasonality. Furthermore, we do not have enough evidence to support a cyclical nature for the time-series.
+
+# Question 2
+All metrics are reasonable, with the exception of MAPE since you will be dividing by zero.
+
+
+# Question 3
+SES and MA are the only two appropriate methods. Refer to any of our review materials e.g, [Week 06](http://rstudio.fsb.miamioh.edu:3838/megahefm/isa444/week06/#section-overview-of-forecasting-methods).
+
+# Question 4
+```{r inflation}
+inflation = read.csv('https://tinyurl.com/y56hzetf')
+
+inflation$DATE %<>% ymd() # to convert from char to date + ymd() from lubridate and two-way pipe from magrittr
+
+trainData = inflation$FPCPITOTLZGUSA[1:24]
+
+sesFit = ses(trainData)
+
+inflation$ses = ses(inflation$FPCPITOTLZGUSA,
+                    alpha = sesFit$model$par['alpha']) %>%  .[['fitted']]
+
+validationData = inflation[25:28, ]
+accuracy(validationData$ses, x = validationData$FPCPITOTLZGUSA)
+```
+
+# Question 5
+I would expect that for any stationary forecasting technique (i.e., MA, cumulative MA, or SES), I would expect that $Y_{t+i}$ in general larger than $F_{t+i}$, which means that the difference on average should be positive (and in this case also possibly large). 
+```{r cumulativeMean}
+gdp = read.csv("https://fred.stlouisfed.org/graph/fredgraph.csv?bgcolor=%23e1e9f0&chart_type=line&drp=0&fo=open%20sans&graph_bgcolor=%23ffffff&height=450&mode=fred&recession_bars=on&txtcolor=%23444444&ts=12&tts=12&width=1168&nt=0&thu=0&trc=0&show_legend=yes&show_axis_titles=yes&show_tooltip=yes&id=GDP&scale=left&cosd=1947-01-01&coed=2020-10-01&line_color=%234572a7&link_values=false&line_style=solid&mark_type=none&mw=3&lw=2&ost=-99999&oet=99999&mma=0&fml=a&fq=Quarterly&fam=avg&fgst=lin&fgsnd=2020-02-01&line_index=1&transformation=lin&vintage_date=2021-03-22&revision_date=2021-03-22&nd=1947-01-01")
+
+gdp$DATE %<>% ymd() 
+
+gdp %<>%  mutate(logGDP = log(GDP),
+                 cma = cummean(GDP),
+                 cumulativeLog = cummean(logGDP),
+             fCMA = lag(cma, na.pad = T),
+             fLoggedData = lag(cumulativeLog, na.pad = T))
+
+accuracy(gdp$fCMA, gdp$GDP)
+accuracy(gdp$fLoggedData, gdp$logGDP)
+```
+
+
+# Question 6
+LES 
+
+# Question 7
+```{r gdpMA3}
+gdp %<>% mutate(ma3 = rollmeanr(GDP, 3, na.pad = T),
+                fMA3 = lag(ma3, na.pad = T)) 
+
+gdp %>% filter(DATE == "2020-04-01")  %>% select(DATE, fMA3)
+```
+
+# Question 8
+```{r gdpMA3_p2}
+gdp$ma3[296]
+```
+
+# Question 9
+```{r gdpHolt}
+gdpHolt = holt(gdp$GDP, alpha =0.2, beta = 0.1, initial = 'optimal')
+gdpHolt
+
+summary(gdpHolt)
+```
+
+
+# Question 10
+Multiplicative since the magnitude of the seasonal factor increases with the increase in values.
+
+# Question 11
+```{r decomposed}
+alcoholSales = read.csv('http://tiny.cc/examAS')
+
+alcoholSalesTS = ts(alcoholSales$S4248SM144NCEN,
+                    start = c(1992, 01), frequency = 12)
+
+decomposed = decompose(alcoholSalesTS, type = "multiplicative")
+
+autoplot(decomposed)
+```
+
+# Question 12
+```{r validationOfQ10}
+hwAdd = hw(alcoholSalesTS, seasonal = "additive")
+hwMult = hw(alcoholSalesTS, seasonal = "multiplicative")
+
+results = rbind(accuracy(hwAdd), accuracy(hwMult))
+rownames(results) = c("A", "M")
+results
+```
+
+
+# Question 13
+
+```{r autourists}
+aut = austourists
+
+trainData = aut[1:(68-16)] %>% ts(start = c(1999, 01), frequency = 4)
+autoplot(aut) # you need to figure out if you should use additive or multiplicative
+
+hwTrain = hw(trainData)
+
+hwFit = hw(aut, 
+           alpha = hwTrain$model$par['alpha'],
+           beta = hwTrain$model$par['beta'],
+           gamma =hwTrain$model$par['gamma']) %>% .[["fitted"]]
+
+accuracy(hwFit[53:68], aut[53:68])
+
+```
+
+
+# Questions 14-18
+Refer to the video
+
+# Question 19
+```{r beerproduction}
+beerprod = read.csv("http://course1.winona.edu/bdeppa/FIN%20335/Datasets/AusBeer.csv")
+
+df = ts(beerprod$Beer.Production, frequency = 4)
+
+decompose(df, type = "additive") %>% autoplot() + theme_bw()
+
+decomposedBeer = decompose(df, type = "additive")
+decomposedBeer$figure
+```
