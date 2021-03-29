@@ -1,0 +1,135 @@
+---
+title: "ISA 444: Business Forecasting"
+subtitle: "18 - ARIMA Models (Cont.)"
+author: Fadel M. Megahed
+date: 'Spring 2021'
+output:
+  beamer_presentation:
+    number_sections: false
+    toc: false
+    slide_level: 3
+    includes: 
+      in_header: structure.txt
+classoption: "aspectratio=169"
+always_allow_html: yes
+bibliography: refs.bib
+link-citations: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE,
+                      verbose = FALSE,
+                      progress = FALSE,
+                      fig.align = "center",
+                      fig.pos = 'p',
+                      fig.width = 5.8,
+                      fig.height= 2.9,
+                      allowframebreaks = TRUE,
+                      fig.margin=TRUE,
+                      kable.force.latex = TRUE,
+                      cache = TRUE)
+options(kableExtra.latex.load_packages = FALSE)
+pacman::p_load(kableExtra, tidyverse, tidyquant, xtable, magrittr, fpp2, ggpubr)
+```
+
+# Preface
+
+### Recap of What we Have Covered Last Two Weeks
+
+**ARMA Models:** Models we considered may have three components, an autoregressive component (AR), and a moving average component (MA).
+
+\begin{block}{\textbf{Main Learning Outcomes from Last 3 Classes}}
+  \begin{itemize}
+      \item \textbf{Describe the behavior of the ACF and PACF of an AR(p) process.}
+			\item \textbf{Describe the behavior of the ACF and PACF of an MA(q) process.}
+			 \item \textbf{Describe the behavior of the ACF and PACF of an ARMA (p,q) process.}
+			\item \textbf{Fit an ARMA model to a time series, evaluate the residuals of a fitted ARMA model to assess goodness of fit, use the Ljung-Box test for correlation among the residuals of an ARMA model.}
+	\end{itemize}
+\end{block}
+
+
+### Summary Table for ARMA Models
+\begin{table}
+  \centering
+  \begin{tabular}{c P{2in} P{2in}}
+\hline \hline
+    \textbf{Model} & \textbf{ACF} & \textbf{PACF} \\ \hline
+    AR(p) & Exponentially decays or damped sinusoidal pattern & Cuts off after lag $p$ \\ \hline
+    MA(q) & Cuts off after lag $q$ & Exponentially decays or damped sinusoidal pattern \\ \hline 
+    ARMA(p,q) & Exponentially decays or damped sinusoidal pattern & Exponentially decays or damped sinusoidal pattern \\ \hline \hline
+  \end{tabular}
+\end{table}
+
+
+### Learning Outcomes for Today's Class
+\begin{block}{\textbf{Main Learning Outcomes}}
+  \begin{itemize}
+      \item \textbf{Explain how ARIMA models work when compared to ARMA models.}
+			\item \textbf{Fit an ARMA model to a time series, evaluate the residuals of a fitted ARMA model to assess goodness of fit, use the Ljung-Box test for correlation among the residuals of an ARIMA model.}
+	\end{itemize}
+\end{block}
+
+
+# ARIMA Models
+
+
+### ARIMA Models for Nonstationary Processes
+When the time series is nonstationary, differencing can be used to transform the series. The ADF or KPSS tests can be used to test for stationarity, and the `ndiffs()` function is useful for determining the number of differences necessary to achieve stationarity.
+
+
+### A Live-Example
+
+In class, we will use the [GNP Data](https://fred.stlouisfed.org/series/GNP) to highlight how ARIMA models can be fit and used for forecasting.
+
+
+### Non-graded In-Class Activity
+You have 15 minutes to examine and model `series10` in [18 - InClass ARIMA Practice.csv](https://miamioh.instructure.com/courses/142177/files/19683144?module_item_id=2957794), where you should:  
+
+  - Determine an appropriate model to fit based on examining the output from the `ndiffs()`, examining both the `acf()` and `pacf()` of your data (or differenced data), and the output from the `checkresiduals()`.
+  
+  - Once you fit an appropriate model, return its accuracy metrics and use it to forecast the values of the time-series for the next 10 time periods
+
+
+# Recap
+
+### Summary of Main Points
+\begin{block}{\textbf{Main Learning Outcomes}}
+  \begin{itemize}
+      \item \textbf{Explain how ARIMA models work when compared to ARMA models.}
+			\item \textbf{Fit an ARMA model to a time series, evaluate the residuals of a fitted ARMA model to assess goodness of fit, use the Ljung-Box test for correlation among the residuals of an ARIMA model.}
+	\end{itemize}
+\end{block}
+
+
+### Things to Do to Prepare for Next Class
+
+ - Thoroughly read Chapter 6.2 of our textbook.
+ 
+ - Go through the slides, examples and make sure you have a good understanding of what we have covered.  
+ 
+ - Go through the posted assignment (see next slide).
+ 
+ 
+### Graded Assignment 16: Evaluating your Understanding
+
+Please go to \href{https://miamioh.instructure.com/courses/142177/quizzes/375148}{Canvas (click here)} and answer the questions. **The assignment is due April 1, 2021 [11:59 PM, Ohio local time].**
+
+**What/Why/Prep?** The purpose of this assignment is to evaluate your understanding and retention of ARIMA modeling. To reinforce your understanding of the covered material, I also suggest reading Chapter 6.1-6.2 of the book.
+
+**General Guidelines:**  
+
+\vspace{-0.5\baselineskip}
+
+  - Individual assignment.  
+  - This is **NOT** a timed assignment.    
+  - Proctorio is NOT required for this assignment.  
+  - You will need to have R installed (or accessible through the \href{https://virtualpc.fsb.miamioh.edu/RDWeb/Pages/en-US/default.aspx}{Remote Desktop})
+ 
+ 
+
+
+---
+
+\maketitle
