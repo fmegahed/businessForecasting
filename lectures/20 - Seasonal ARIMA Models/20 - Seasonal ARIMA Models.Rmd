@@ -1,0 +1,84 @@
+---
+title: "ISA 444: Business Forecasting"
+subtitle: "20 - Seasonal ARIMA Models"
+author: Fadel M. Megahed
+date: 'Spring 2021'
+output:
+  beamer_presentation:
+    number_sections: false
+    toc: false
+    slide_level: 3
+    includes: 
+      in_header: structure.txt
+classoption: "aspectratio=169"
+always_allow_html: yes
+bibliography: refs.bib
+link-citations: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE,
+                      verbose = FALSE,
+                      progress = FALSE,
+                      fig.align = "center",
+                      fig.pos = 'p',
+                      fig.width = 5.8,
+                      fig.height= 2.9,
+                      allowframebreaks = TRUE,
+                      fig.margin=TRUE,
+                      kable.force.latex = TRUE,
+                      cache = TRUE)
+options(kableExtra.latex.load_packages = FALSE)
+pacman::p_load(kableExtra, tidyverse, tidyquant, xtable, magrittr, fpp2, ggpubr)
+```
+
+# Preface
+
+### Recap of What we Have Covered Last Class
+
+\begin{block}{\textbf{Main Learning Outcomes}}
+  \begin{itemize}
+      \item \textbf{Describe AIC, AICc, and BIC and how they are used to measure model fit.}
+      \item \textbf{Describe the algorithm used within the auto.arima() function to fit an ARIMA model.}
+      \item \textbf{Describe the results of the auto.arima() function.}
+	\end{itemize}
+\end{block}
+
+### Learning Outcomes for Today's Class
+\begin{block}{\textbf{Main Learning Outcomes}}
+  \begin{itemize}
+      \item \textbf{Describe a seasonal ARIMA model and explain how it applies to a seasonal time series.}
+      \item \textbf{Recognize when to fit a seasonal ARIMA model.}
+	\end{itemize}
+\end{block}
+
+
+
+# Seasonal ARIMA Models
+
+### Live Coding: Example 1
+```{r birthData}
+pacman::p_load(astsa)
+birthData = birth # also from the astsa package
+```
+
+### In-Class Activity
+
+Use the data [“20 - Netflix_growth_pct_2000.csv”](https://miamioh.instructure.com/courses/142177/files/19770246?module_item_id=2963681). Fit an ARIMA model using the auto.arima() function. Describe the model that is fit, evaluate the model residuals.
+
+
+### Things to Do to Prepare for Exam (Next Week)
+
+ - Thoroughly read Chapters 6.2-6.8 of our textbook.
+ 
+ - Go through the slides, examples and make sure you have a good understanding of what we have covered.  
+ 
+ - No assignment for today's class.
+ 
+
+
+---
+
+\maketitle
