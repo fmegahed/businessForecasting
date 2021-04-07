@@ -1,0 +1,90 @@
+---
+title: "ISA 444: Business Forecasting"
+subtitle: "21 - Seasonal ARIMA Models (Cont.)"
+author: Fadel M. Megahed
+date: 'Spring 2021'
+output:
+  beamer_presentation:
+    number_sections: false
+    toc: false
+    slide_level: 3
+    includes: 
+      in_header: structure.txt
+classoption: "aspectratio=169"
+always_allow_html: yes
+bibliography: refs.bib
+link-citations: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE,
+                      verbose = FALSE,
+                      progress = FALSE,
+                      fig.align = "center",
+                      fig.pos = 'p',
+                      fig.width = 5.8,
+                      fig.height= 2.9,
+                      allowframebreaks = TRUE,
+                      fig.margin=TRUE,
+                      kable.force.latex = TRUE,
+                      cache = TRUE)
+options(kableExtra.latex.load_packages = FALSE)
+pacman::p_load(kableExtra, tidyverse, tidyquant, xtable, magrittr, fpp2, ggpubr)
+```
+
+# Preface
+
+### Recap of What we Have Covered Last Class
+\begin{block}{\textbf{Main Learning Outcomes}}
+  \begin{itemize}
+      \item \textbf{Describe a seasonal ARIMA model and explain how it applies to a seasonal time series.}
+      \item \textbf{Recognize when to fit a seasonal ARIMA model.}
+	\end{itemize}
+\end{block}
+
+### Learning Outcomes for Today's Class
+\begin{block}{\textbf{Main Learning Outcomes}}
+  \begin{itemize}
+      \item \textbf{Evaluate your understanding of seasonal ARIMA models.}
+      \item \textbf{Discuss a potential alternative to Exam 4.}
+      \item \textbf{Answer questions pertaining to Exam 3.}
+	\end{itemize}
+\end{block}
+
+
+
+# Seasonal ARIMA Models
+
+### In-Class Activity
+
+Use the data [“20 - Netflix_growth_pct_2000.csv”](https://miamioh.instructure.com/courses/142177/files/19770246?module_item_id=2963681). Fit an ARIMA model using the auto.arima() function. Describe the model that is fit, evaluate the model residuals.
+
+
+# Project Description
+
+### Project Discussion
+
+During class, we will go through the document [21 - Project Description (Route 2 for Exam 4)](https://miamioh.instructure.com/courses/142177/files/19798934?module_item_id=2965703). I will highlight:  
+
+  1. Pedagogical goals behind the project;  
+  
+  2. Tasks needed to successfully complete the project; and  
+  
+  3. Project ``logistics". 
+  
+
+# Exam 3 Prep
+
+### Things to Do to Prepare for Exam (Next Week)
+
+ - Thoroughly read Chapters 1, 2, 3, 4, and 6.1 -- 6.8 of our textbook.
+ 
+ - Go through the slides, examples and make sure you have a good understanding of what we have covered.  
+ 
+
+
+---
+
+\maketitle
