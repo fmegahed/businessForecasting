@@ -1,0 +1,74 @@
+---
+title: "23 - Class Notes"
+author: "Fadel M Megahed"
+date: "4/19/2021"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    paged_df: true
+    theme: simplex
+    code_folding: show
+    code_download: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Required Packages
+In the code chunk below, we use the `pacman` package to load the required packages and install them if necessary.
+
+```{r packages}
+if(require(pacman)==FALSE) install.packages("pacman")
+pacman::p_load(tidyverse, 
+               magrittr, # for the two-way pipe
+               fpp2, # accuracy() function, Arima(), auto.arima(),
+               astsa, # package is for the required data
+               plotly, # for interactive graphs
+               stargazer) 
+```
+
+# Loading the J&J Data
+```{r jj}
+jj = jj # assigning the jj data (from astsa) to an object of the same name
+class(jj) # to check and see if the class is a ts object
+frequency(jj) # to check the frequency --> based on the print out (=4)
+jj
+p = autoplot(jj) + theme_bw()
+ggplotly(p)
+```
+
+Based on the plot, we can make three observations:  
+
+  (1) The data is not linear, which means that fitting a linear regression directly to this data is not prudent.  
+  (2) The variance was not constant as it increased over time (with larger values of the EPS).  
+  (3) The data is exhibting a seasonal pattern (fourth quarter is consistently below the values for q3 and q1).
+  
+
+# Transforming the J&J TS
+
+```{r logtransform}
+log_jj = log(jj)
+p2 = autoplot(log_jj)
+ggplotly(p2) # a linear regression line is probably okay (the variance is more stable with the transformation)
+```
+
+
+# Time as the Independent Variable
+```{r extractingTime}
+t = time(log_jj) # time makes a decimal date from the ts (if freq  >  1)
+t
+```
+
+# Fit the Model
+
+```{r model}
+model = lm (log_jj ~ t) # t is the ind variable and log_jj is the response
+names(model)
+summary(model)
+```
+
+```{r modelPrint, results='asis'}
+stargazer::stargazer(model, type = "html")
+```
