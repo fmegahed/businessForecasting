@@ -1,0 +1,168 @@
+---
+title: "24 - Time Series Regression"
+author: "Fadel M Megahed"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    paged_df: true
+    theme: simplex
+    code_folding: show
+    code_download: true
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Learning Objectives for Today's Class {-}
+
+  1. Conduct tests for significance of individual regression coefficients.  
+  2. Use a simple linear regression model for trend adjustment.
+  3. Interpret regression diagnostic plots.  
+  4. Create prediction intervals for individual values of the response variable.  
+  5. Discuss Exam 03 (Not in R).
+
+# Required Packages {-}
+In the code chunk below, we use the `pacman` package to load the required packages and install them if necessary.
+
+```{r packages}
+if(require(pacman)==FALSE) install.packages("pacman")
+pacman::p_load(tidyverse, 
+               magrittr, # for the two-way pipe
+               fpp2, # accuracy() function, Arima(), auto.arima(),
+               astsa, # package is for the required data
+               plotly, # for interactive graphs
+               stargazer) 
+```
+
+# Recap of What we Covered Last Class
+
+## Loading the J&J Data
+```{r jj}
+jj = jj # assigning the jj data (from astsa) to an object of the same name
+class(jj) # to check and see if the class is a ts object
+frequency(jj) # to check the frequency --> based on the print out (=4)
+jj
+p = autoplot(jj) + theme_bw()
+ggplotly(p)
+```
+
+Based on the plot, we can make three observations:  
+
+  (1) The data is not linear, which means that fitting a linear regression directly to this data is not prudent.  
+  (2) The variance was not constant as it increased over time (with larger values of the EPS).  
+  (3) The data is exhibiting a seasonal pattern (fourth quarter is consistently below the values for q3 and q1).
+  
+
+## Transforming the J&J TS
+
+```{r logtransform}
+log_jj = log(jj)
+p2 = autoplot(log_jj)
+ggplotly(p2) # a linear regression line is probably okay (the variance is more stable with the transformation)
+```
+
+
+## Time as the Independent Variable
+```{r extractingTime}
+t = time(log_jj) # time makes a decimal date from the ts (if freq  >  1)
+t
+```
+
+## Fit the Model
+
+```{r model}
+model = lm(log_jj ~ t) # t is the ind variable and log_jj is the response
+names(model)
+summary(model)
+```
+
+**Let us recap some of the outputs.** 
+
+### Regression Equation
+```{r extractingValuesForEquation}
+intercept = summary(model) %>% .[['coefficients']] %>% .[1, 'Estimate']
+beta1 = summary(model) %>% .[['coefficients']] %>% .[2, 'Estimate']
+sigma = summary(model) %>% .[['sigma']]
+```
+$y_t = `r round(intercept, 4)` + `r round(beta1, 4)`t + \varepsilon, \, \text{where } \varepsilon\sim\mathcal N(0, ~ `r round(sigma, 4)`^2)$ 
+
+### Predicted/Fitted Values and Residuals
+```{r fittedVals}
+fit = model$fitted.values
+# In class on Monday, I believe we examined Q3 of 1972
+fit[51]
+res = model$residuals 
+```
+
+### Multiple R2 [NEW]
+```{r multipleR2}
+modelSummary = summary(model)
+r2 = modelSummary$r.squared
+```
+$r^2$ = `r r2` measures the variability of the observations (log of the EPS for J&J) around the fitted regression line. 
+
+
+
+### Tests for Significance
+We are testing the following:
+
+$H_0: \, \beta_1 = 0$, and our  $H_1: \, \beta_1 \ne 0$
+
+Given that our df = `r modelSummary$df[2]` and the estimated value for our $\beta_1$, we have a t-value of `r modelSummary$coefficients[2, 't value']` indicating that we are `r modelSummary$coefficients[2, 't value']` standard errors above 0. Hence, the $p$_value is significant. 
+
+Given that $\beta_1 \ne 0$, we can conclude that year is a significant linear predictor of the **logged** EPS of J&J. 
+
+
+### Predicting 1981 
+
+One option is to just use the equation and plug the values for the year manually:  
+
+Q1: log of EPS for 1981 = `r (intercept + (beta1*1981.0) )`; EPS = `r exp(intercept + (beta1*1981.0))`
+Q2: log of EPS for 1981 = `r (intercept + (beta1*1981.25) )`; EPS = `r exp(intercept + (beta1*1981.25))`
+
+
+Alternatively, you can use the forecast function from the fpp2 package.
+
+```{r forecasting1981}
+forecast(model, h=4, newdata = c(1981.0, 1981.25, 1981.5, 1981.75), level = 95)
+df = data.frame(actual = log_jj, fit = model$fitted.values)
+df %>% ggplot(aes(x = time(actual))) + 
+  geom_line(aes(y = fit)) +
+  geom_line(aes(y = actual))
+```
+
+# Use a simple linear regression model for trend adjustment.
+We will be using a `tslm()` from the fpp2 package. This allows us to automatically capture time; however, time will be coded as an integer. 
+
+```{r fitTSLM}
+modelTS = tslm(log_jj ~ trend)
+summary(modelTS)
+tsForecast = forecast(modelTS, h =8, level = 95)
+autoplot(tsForecast) + autolayer(fitted(tsForecast)) + theme(legend.position = "none")
+```
+
+
+
+
+# Interpret regression diagnostic plots.  
+
+```{r resDiagnostics}
+source('resPlotTS.R') # would work assuming that you have placed the R file in the same directory
+
+resplot(res = res, fit = fit, freq = 4)
+
+```
+
+
+
+# Create prediction intervals for individual values of the response variable.
+See the output from "Use a simple linear regression model for trend adjustment".
+
+
+
+# Discuss Exam 03 (Not in R)
+We have discussed until how the Limits of the ACF Plot are computed.
