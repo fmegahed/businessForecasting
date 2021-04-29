@@ -1,0 +1,127 @@
+---
+title: "26 - Class Notes"
+author: "Fadel M Megahed"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    paged_df: true
+    theme: simplex
+    code_folding: show
+    code_download: true
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Recap of What we Learned Last Class
+
+  1. Use regression to account for seasonality in a time series.  
+  2. Compare the performance of the regression model with that obtained from `auto.arima()`.
+ 
+  
+## Required Packages
+In the code chunk below, we use the `pacman` package to load the required packages and install them if necessary.
+
+```{r packages, results='hide'}
+if(require(pacman)==FALSE) install.packages("pacman")
+pacman::p_load(tidyverse, 
+               magrittr, # for the two-way pipe
+               fpp2, # accuracy() function, Arima(), auto.arima(),
+               astsa, # package is for the required data
+               plotly, # for interactive graphs
+               ggpubr) 
+
+source('https://raw.githubusercontent.com/fmegahed/businessForecasting/master/lectures/24%20-%20Time%20Series%20Regression%20(Cont)/resPlotTS.R') # loading our resPlot function from Last Class
+```
+
+
+## Main Learning Outcomes for Today's Class
+  
+  (1) Combine regression with ARIMA models to model a time series with autocorrelated errors.    
+  (2) Use the xreg argument to combine ARIMA models with regression predictors.
+
+
+---
+
+
+# Combining Regression with ARIMA Models
+
+## Preface
+We have learned to fit ARIMA models to predict a series from itself, removing the autocorrelation from a series. These methods are useful, but don’t allow us to combine “outside” information to boost our forecast.
+
+Now we will discuss combining regression (**outside information**) and ARIMA models (inside information) to forecast a time series.
+
+A multiple regression model takes on the form:  
+$$Y_t = \beta_0 + \beta_1 x_{t,1} + \beta_2 x_{t,2} + \dots + \beta_q x_{t,q} + \epsilon_t,$$
+where we typically assume that $\epsilon_t$ is independent, identically distributed white noise (normally distributed).
+
+
+## What we Learned from the J&J Example 
+
+```{r tsRegRecap, warning=FALSE, verbose = FALSE}
+log_jj = log(jj) # to make the data more linear and stablize the variance a bit
+t = time(log_jj) # capture/create a time index
+
+model4 = tslm(log_jj ~ trend + season) # fitting a regression model with season and trend
+
+modelSummary = summary(model4) # saving the summary output into the object modelSummary
+
+resplot(res = model4$residuals, fit = model4$fitted.values) # visualizing the residuals and fitted values
+```
+
+**Based on the J&J Example**, when our dependent and independent variables are observed over time, $\epsilon_t$  is often correlated over time. **Hence, the assumptions of iid residuals are not met and the fitted regression models should not be used.**
+
+## Possible Solution 
+
+Thus, we will restate our model as follows:  
+$$Y_t = \beta_0 + \beta_1 x_{t,1} + \beta_2 x_{t,2} + \dots + \beta_q x_{t,q} + \eta_t,$$ 
+where $\eta_t$ **follows an ARIMA model.**  
+
+When we model $\eta_t$, there will be errors from this model, denoted as $\epsilon_t$.  Thus, we have the errors from the regression, $\eta_t$, and the errors from the ARIMA model, denoted as $\epsilon_t$.  Only the errors from the ARIMA, $\eta_t$ are iid white noise.
+
+
+## Using R to Fit The Model
+
+We will use the “uschange” data from the `fpp2` package to forecast changes in personal consumption expenditures based on personal disposable income from 1970 to 2016.  
+
+**Process:**  
+
+  (1) Start by plotting the quarterly changes in US consumption and personal income  
+  (2) Fit a regression with Y = change in consumption and X = Change in personal income, with autocorrelated errors  
+  (3) Check the residual plots to ensure the assumptions of the model are met  
+  
+
+```{r inclassExample}
+
+
+```
+
+
+---
+
+# In-Class Activities
+
+  (1) Compare the results from the class example, with the following three models:  
+    (a) auto.arima using only the Y series.  
+    (b) autoarima using two explanatory variables ("Income" and "Savings").  
+    (c) lm using both income and savings.  
+    
+  (2) Which models are suitable? (i.e., the assumptions about the model residuals are met).  
+  
+  (3) Among the suitable models, pick the best model.
+
+
+```{r inClassActivity}
+
+
+```
+
+
+
+
+---
+
