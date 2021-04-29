@@ -1,0 +1,143 @@
+---
+title: "25 - Class Notes"
+author: "Fadel M Megahed"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    paged_df: true
+    theme: simplex
+    code_folding: show
+    code_download: true
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Recap of What we Learned this Past Week
+
+  1. Conduct tests for significance of individual regression coefficients.  
+  2. Use a simple linear regression model for trend adjustment.
+  3. Interpret regression diagnostic plots.  
+  4. Create prediction intervals for individual values of the response variable.  
+  5. Discuss Exam 03 (Not in R).
+ 
+  
+## Required Packages
+In the code chunk below, we use the `pacman` package to load the required packages and install them if necessary.
+
+```{r packages}
+if(require(pacman)==FALSE) install.packages("pacman")
+pacman::p_load(tidyverse, 
+               magrittr, # for the two-way pipe
+               fpp2, # accuracy() function, Arima(), auto.arima(),
+               astsa, # package is for the required data
+               plotly, # for interactive graphs
+               stargazer) 
+
+source('https://raw.githubusercontent.com/fmegahed/businessForecasting/master/lectures/24%20-%20Time%20Series%20Regression%20(Cont)/resPlotTS.R') # loading our resPlot function from Last Class
+```
+
+## An Overview of Exam 3
+Please refer to our class discussions.
+
+
+## A Refresher of Time-Series Regression Concepts Learned so Far
+
+Using the `jj` dataset from the [astsa package](https://cran.r-project.org/web/packages/astsa/astsa.pdf), we have discussed how we can regress the logged EPS for J&J as a function of time. The regression can be performed using the: (a) `lm()` from base R, where we would need to create the time-feature(s) ourselves, or (b) using the `tslm()` from the forecast package (which we typically load using fpp2). **In class, I will quickly go through the process of fitting the data to ensure that we are all on the same page.**
+```{r tsRegRecap}
+log_jj = log(jj) # to make the data more linear and stablize the variance a bit
+t = time(log_jj) # capture/create a time index
+
+
+model1 = lm(log_jj ~ t)
+summary(model1)
+
+model2 = tslm(log_jj ~ trend)
+summary(model2)
+
+resplot(res = model2$residuals, fit = model2$fitted.values, freq = 4)
+checkresiduals(model2)
+```
+
+### Model 1
+$y_t = -327.5 + 0.1668t \longrightarrow$ from the `summary(model1)` output.
+
+### Model 2
+$y_t = -0.6677756 + 0.0416992*trend$
+
+## Main Learning Outcomes for Today's Class
+  
+  (1) Use regression to account for seasonality in a time series.  
+  (2) Compare the performance of the regression model with that obtained from `auto.arima()`.
+
+
+---
+
+
+# Seasonal Regression
+
+## Using the `lm()` Function
+```{r seasonalReg1}
+season = cycle(log_jj) %>% factor()
+
+model3 = lm(log_jj ~ t + season)
+summary(model3)
+resplot(res = model3$residuals, fit = model3$fitted.values)
+checkresiduals(model3)
+```
+
+$$
+\begin{aligned}
+  y_t = -328.3 + 0.1672t & + 0.02812Q2 \\
+  & + 0.09823Q3 \\
+  & - 0.1705Q4
+\end{aligned}
+$$
+
+**Question: Based on the equation above, can we interpret the 0.02812 as the difference in predicted log EPS between Q1 and Q2?**
+
+Using 1970Q1 to Q2 as an example, 
+
+Q1: $y_t = -328.3 + 0.1672*(1970.00) = 1.084$ 
+
+Q2: $y_t = -328.3 + 0.1672*(1970.25) + (0.02812 * 1) = 1.15392$ 
+
+Difference between the fitted values is 0.06992, which is equal to 0.1672*(0.25) + 0.02812.
+
+## Using the `tslm()` Function
+
+```{r seasonalReg2}
+model4 = tslm(log_jj ~ trend + season)
+summary(model4)
+```
+
+
+---
+
+# Comparison with auto.arima() [In-Class Activity]
+
+Use the log_jj data.  
+
+  (1)	Use the `auto.arima()` function to fit an arima model to the data.  What model is fit to the data?   
+  
+  (2) Compare the residuals and the accuracy of the seasonal regression, to the auto.arima results.  Which model fits better?
+
+```{r autoArima}
+model5 = auto.arima(log_jj)
+summary(model5)
+
+resplot(res = model5$residuals, fit = model5$fitted, freq = 4)
+checkresiduals(model5)
+
+AIC(model4)
+BIC(model4)
+
+```
+Based on: (a) AIC/BIC, (b) the models' assumptions of iid residuals, and (c) the predictive accuracy of the models (as measured using RMSE), model5 from the 'auto.arima()` is a much better model.
+
+---
+
