@@ -1,0 +1,444 @@
+---
+title: "ISA 444: Business Forecasting"
+subtitle: "27 - Advanced Topics"
+author: Fadel M. Megahed
+date: 'Spring 2021'
+output:
+  beamer_presentation:
+    number_sections: false
+    toc: false
+    slide_level: 3
+    includes: 
+      in_header: structure.txt
+classoption: "aspectratio=169"
+always_allow_html: yes
+bibliography: refs.bib
+link-citations: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE,
+                      verbose = FALSE,
+                      progress = FALSE,
+                      fig.align = "center",
+                      fig.pos = 'p',
+                      fig.width = 5.8,
+                      fig.height= 2.9,
+                      allowframebreaks = TRUE,
+                      fig.margin=TRUE,
+                      kable.force.latex = TRUE,
+                      cache = TRUE)
+options(kableExtra.latex.load_packages = FALSE)
+pacman::p_load(kableExtra, tidyverse, tidyquant, xtable, magrittr, fpp2, ggpubr)
+```
+
+# Preface
+
+### Recap of What we Have Covered This Semester
+\begin{block}{\textbf{Main Learning Outcomes}}
+  \begin{itemize}
+      \item Explain the purpose of forecasting in a business setting.
+      \item Use the basic tools of forecasting including plots, summary measures, transformations, measures of forecast accuracy, and prediction intervals. 
+      \item Forecast a nonseasonal time series using simple exponential smoothing.
+      \item Forecast a nonseasonal time series using linear exponential smoothing.
+      \item Use decomposition methods and Holt-Winters smoothing methods to forecast a seasonal time series.
+      \item Use ARIMA models to forecast a time series.
+      \item Use simple and multiple linear regression models to forecast a time series.
+	\end{itemize}
+\end{block}
+
+
+### Recap: Guidelines for Transforming Time-Series Data
+
+\vspace{\baselineskip}
+
+\begin{figure}
+		\centering
+		\adjustbox{max width=\textwidth, frame}{%
+			\begin{forest}
+				[\Large{\textbf{Transformation Methods for Time Series}}
+				[\textbf{Stabilize the Mean}
+				[\textcolor{miamired}{\textbf{Differencing}}
+				[Eliminate/Reduce
+				[Seasonality]
+				[Trend]]
+				[Compute New Cases\footnotemark]]]
+				[\textbf{Stabilize the Variance}
+				[\textcolor{miamired}{\textbf{Power Transformations}}
+				[Log]
+				[Square Root]]] % stabilize the variance
+				[\textbf{$\sim$Stabilize both}
+				[\textcolor{miamired}{\textbf{Growth Rates}}]
+				[\textcolor{miamired}{\textbf{First diff of Log\footnotemark}}
+				[Exponential Growth TS
+				[$\ln$ to get a TS with a linear trend]
+				[Then diff to get a stationary series]
+				]]]
+				[\textbf{Rescale}
+				[\textcolor{miamired}{\textbf{($0-1$) Scaling\footnotemark}}]
+				[\textcolor{miamired}{\textbf{$z-$transform\footnotemark}}]
+				]
+				]
+		\end{forest}}
+		\caption{A classification of common transformation approaches for time series data.\footnotemark}
+	\end{figure}
+
+\vspace{-\baselineskip}
+
+\addtocounter{footnote}{-5}
+
+\stepcounter{footnote}\footnotetext{The \href{https://covid19datahub.io/}{COVID19 package} returns cumulative cases, i.e. a first difference $\longrightarrow$ new confirmed cases.}
+
+\stepcounter{footnote}\footnotetext{First difference of LOG $\approxeq$ percentage change. This is almost exact if the percentage change is small, but for larger percentage changes, it may differ greatly (see \href{https://faculty.fuqua.duke.edu/~rnau/Decision411_2007/411log.htm}{here for more details}).}
+
+\stepcounter{footnote}\footnotetext{Rescaling of the data from the original range so that all values are within the range of 0 and 1. Mathematically, speaking this can be achieved by calculating $y_t = \frac{x_t - \min}{\max - \min}$.}
+
+\stepcounter{footnote}\footnotetext{One can normalize a time-series by $z_t = \frac{x_t - \mu}{\sigma}$.}
+
+\stepcounter{footnote}\footnotetext{My (incomplete) attempt to provide you with a taxonomy for time series data transformations.}
+
+### Recap: A 10,000 Foot View of Forecasting Methods
+
+\vspace{\baselineskip}
+
+\begin{figure}
+		\centering
+		\adjustbox{max width=\textwidth, frame}{%
+			\begin{forest}
+				[\large{\textbf{Forecasting}}
+				[\textbf{Judgemental}
+				[Sales Composite]
+				[Customer Survey]
+				[Delphi Method]]
+				[\textbf{Quantitative}
+				[\textcolor{miamired}{\textbf{Extrapolative}}
+				[\textcolor{darkgreen}{\textbf{Naive}}]
+				[\textbf{Smoothing-based}
+				[\textcolor{darkgreen}{\textbf{$\approx$Stationary}}
+				[Average]
+				[MA]
+				[SES]]
+				[\textcolor{darkgreen}{\textbf{Trend}}
+				[Holt's]]
+				[\textcolor{darkgreen}{\textbf{Both?}}
+				[\textcolor{darkgreen}{Holt-Winters}]
+				]]
+				[\textbf{``Advanced''}
+				[(S)ARIMA]
+				[GARCH]]]
+				[\textcolor{miamired}{\textbf{Causal}}
+				[\textbf{Statistical}
+				[Regression with ARIMA Errors]]
+				[\textbf{ML-Based}
+				[\textcolor{darkgreen}{\textbf{Feature Eng.}}
+				[e.g. \textcolor{orange}{AutoML}]]]
+				]
+				]
+				]
+		\end{forest}}
+		\caption{A 10,000 foot view of forecasting techniques\footnotemark}
+\end{figure}
+
+\footnotetext{An (incomplete) classification of forecasting techniques. Note that these focus on univariate time-series. Hence, they exclude popular approaches used in multivariate time series forecasting.}
+
+
+### Learning Outcomes for Today's Class
+\begin{block}{\textbf{Main Learning Outcomes}}
+  \begin{itemize}
+      \item \textbf{Examine the Use of autoML for TS Prediction.}
+	\end{itemize}
+\end{block}
+
+
+
+# The Basics of Machine Learning
+
+### Definition
+
+**@mitchell2006discipline has elgontely defined the scientific field of machine learning to be centered around answering the following question:**
+
+\vspace{0.5\baselineskip}
+
+\begin{quotation}
+\noindent ``How can we build computer systems that automatically improve with experience, and what
+are the fundamental laws that govern all learning processes?''
+\end{quotation}
+
+**In his view, machine learning is the study of algorithms that:**  
+
+  - **improve its performance** *P*  
+  - **at task** *T*   
+  - **following experience** *E* 
+
+
+### A Paradigm Shift in Programming 
+
+\begin{center}
+\href{https://subscription.packtpub.com/book/big_data_and_business_intelligence/9781789616729/1/ch01lvl1sec10/defining-machine-learning-and-why-we-need-it}{\includegraphics[width=\linewidth, height=0.7\textheight, keepaspectratio, frame]{Figures/mltp.png}}
+
+Source: Image is from Yuxi Lui (2019). Python Machine Learning by Example. Packt Publishers (click on image for more details).
+\end{center}
+
+### Defining the Learning Task {.allowframebreaks}
+
+\begin{center}
+  \textbf{\textcolor{miamired}{Improve	on	task	T,	with	respect	to performance	metric	P,	based	on experience	E
+}}
+\end{center}
+
+\vspace{0.5\baselineskip}
+
+\begin{columns}
+  \begin{column}{0.48\textwidth}
+    \begin{itemize}
+      \item \textbf{T: Playing checkers}
+      \item \textbf{P: Percentage of games won against an arbitrary opponent}
+      \item \textbf{E: Playing practice games against itself}
+    \end{itemize}
+  \end{column}
+  \begin{column}{0.48\textwidth}
+    \centering \href{https://commons.wikimedia.org/wiki/File:Pool_checkers_(Jamaica).jpg}{\includegraphics[height=0.5\textheight]{Figures/Pool_checkers_(Jamaica).jpg}}
+  \end{column}
+\end{columns}
+
+Note: This idea in @samuel1959some led to the popularization of machine learning. 
+
+
+\begin{center}
+  \textbf{\textcolor{miamired}{Improve	on	task	T,	with	respect	to performance	metric	P,	based	on experience	E
+}}
+\end{center}
+
+\vspace{0.5\baselineskip}
+
+\begin{columns}
+  \begin{column}{0.48\textwidth}
+    \begin{itemize}
+      \item \textbf{T: Autonomous driving using LADAR sensing}
+      \item \textbf{P: Average distance traveled before human-judged error}
+      \item \textbf{E: A sequence of images and steering commands recorded while
+observing a human driver}
+    \end{itemize}
+  \end{column}
+  \begin{column}{0.48\textwidth}
+    \centering \href{https://commons.wikimedia.org/wiki/File:Waymo_Chrysler_Pacifica_in_Los_Altos,_2017.jpg}{\includegraphics[height=0.5\textheight]{Figures/1920px-Waymo_Chrysler_Pacifica_in_Los_Altos,_2017.jpg}}
+  \end{column}
+\end{columns}
+
+\begin{center}
+  \scriptsize Sources: Image by Dllu - Own work, CC BY-SA 4.0, \url{https://commons.wikimedia.org/w/index.php?curid=64517567} and text from \url{https://www.seas.upenn.edu/~cis519/fall2017/lectures/01_introduction.pdf}
+\end{center}
+
+
+\begin{center}
+  \textbf{\textcolor{miamired}{Improve	on	task	T,	with	respect	to performance	metric	P,	based	on experience	E
+}}
+\end{center}
+
+\vspace{0.5\baselineskip}
+
+\begin{columns}
+  \begin{column}{0.48\textwidth}
+    \begin{itemize}
+      \item \textbf{T: Categorizing network traffic as begnin or portmap (or another DDoS attack)}
+      \item \textbf{P: Percentage of correctly categorized observations in each group}
+      \item \textbf{E: Database of network traffic, with human given labels}
+    \end{itemize}
+  \end{column}
+  \begin{column}{0.48\textwidth}
+    \centering \href{https://commons.wikimedia.org/wiki/File:Ddos-attack-ex.png}{\includegraphics[height=0.5\textheight, frame]{Figures/Ddos-attack-ex.png}}
+  \end{column}
+\end{columns}
+
+
+### History of Machine Learning (click for source) [1]
+
+\begin{center}
+\href{https://towardsdatascience.com/a-weird-introduction-to-deep-learning-7828803693b0}{\includegraphics[width=\textwidth, trim={0 2 0 3.5in}, clip, frame]{Figures/1_Z_DnCyKt18RM0aCCrFzaIQ.png}}
+\end{center}
+
+### History of Machine Learning (click for source) [2]
+
+\begin{center}
+\href{https://twitter.com/evankirstel/status/1036675274287525896/photo/1}{\includegraphics[height=0.82\textheight, trim={0 0 0 2in}, clip, frame]{Figures/decadesofAI.jpg}}
+\end{center}
+
+
+### From Task (T) to Model Type: Types of Learning
+
+\centering 
+
+\href{https://scikit-learn.org/stable/tutorial/machine_learning_map/index.html}{\includegraphics[width=\textwidth, height=0.8\textheight, keepaspectratio, frame]{Figures/ml_map.png}}
+    
+\footnotesize \textbf{Source:} SciKit-Learn @scikit2020choosing.
+
+
+# Machine Learning Applications to Time-Series Data
+
+### autoML Installation Guidelines
+
+Based on <http://h2o-release.s3.amazonaws.com/h2o/rel-zipf/2/index.html>:
+
+```{r autoMLInstall, eval = F}
+# The following two commands remove any previously installed H2O packages for R.
+if ("package:h2o" %in% search()) { detach("package:h2o", unload=TRUE) }
+if ("h2o" %in% rownames(installed.packages())) { remove.packages("h2o") }
+
+# Next, we download packages that H2O depends on.
+pkgs <- c("RCurl","jsonlite")
+for (pkg in pkgs) {
+  if (! (pkg %in% rownames(installed.packages()))) { install.packages(pkg) }
+}
+
+# Now we download, install and initialize the H2O package for R.
+install.packages("h2o", type="source", 
+                 repos="http://h2o-release.s3.amazonaws.com/h2o/rel-zipf/2/R")
+```
+
+
+### Let us Predict the Price of $ZIL: Missing Values
+
+```{r autoMLData, fig.height=1.5}
+pacman::p_load(tidyverse, tidyquant, DataExplorer, lubridate, h2o, imputeTS)
+zil = tidyquant::tq_get('ZIL-USD', from = '2018-01-01', to = Sys.Date() - 1) %>% 
+  select(date, adjusted, volume)
+plot_missing(zil, theme_config = list(legend.position = c("none")) )
+```
+
+
+### Let us Predict the Price of $ZIL: Feature Engineering [1]
+```{r autoMLFeatures1}
+cryptoFeatures = zil %>% 
+  mutate(adjusted = na_interpolation(adjusted),
+         year = lubridate::year(date),
+         quarter = quarter(date) %>% as.factor(),
+         day = wday(date, label = T) %>% as.character() %>% as.factor,
+         mday = mday(date),
+         qday = qday(date),
+         lagPrice = lag(adjusted),
+         ma7 = rollmeanr(adjusted, k = 7, na.pad = T) %>% lag,
+         ma30 = rollmeanr(adjusted, k = 30, na.pad = T) %>% lag,
+         lagVolume = lag(volume)) %>% 
+  select(-volume)
+```
+
+### Let us Predict the Price of $ZIL: Feature Engineering [2]
+```{r autoMLFeatures2}
+btc = tq_get('BTC-USD', from = '2018-01-01', to = Sys.Date() - 1) %>% 
+  select(date, adjusted, volume) %>% 
+  mutate(adjusted = na_interpolation(adjusted), 
+         volume = na_interpolation(volume),
+         lagAdjBTC = lag(adjusted),
+         lagVolBTC = lag(volume)) %>% 
+  select(date, lagAdjBTC, lagVolBTC)
+
+cryptoFeatures = left_join(cryptoFeatures, btc, by = 'date') %>% 
+  na.omit()
+```
+
+
+### Let us Predict the Price of $ZIL: Train, Validation & Test
+
+```{r trainSplit}
+trainData = cryptoFeatures %>% filter(year < 2020)
+validData = cryptoFeatures %>% filter(year == 2020)
+testData  = cryptoFeatures %>% filter(year == 2021)
+
+# Set names for h2o
+y = "adjusted"
+x = setdiff(names(trainData), c(y, 'date') )
+```
+
+
+### Let us Predict the Price of $ZIL: Fitting the h2o Model [1]
+```{r h2oModelFit1, results='hide'}
+h2o.init() # Fire up h2o
+h2o.no_progress() # Turn off progress bars
+
+# Convert to H2OFrame objects
+train_h2o = as.h2o(trainData)
+valid_h2o = as.h2o(validData)
+test_h2o  = as.h2o(testData)
+```
+
+### Let us Predict the Price of $ZIL: Fitting the h2o Model [2]
+```{r h2oModelFit2, results='hide'}
+automl_models_h2o = h2o.automl(
+    x = x, 
+    y = y, 
+    training_frame = train_h2o, 
+    validation_frame = valid_h2o, 
+    leaderboard_frame = test_h2o, 
+    max_runtime_secs = 60, 
+    stopping_metric = "RMSE")
+```
+
+### Let us Predict the Price of $ZIL: Best Model [1]
+```{r h2oModelFit3}
+automl_leader = automl_models_h2o@leader
+pred_h2o = h2o.predict(automl_leader, newdata = test_h2o)
+h2o.performance(automl_leader, newdata = test_h2o)
+```
+
+
+### Let us Predict the Price of $ZIL: Best Model [2]
+```{r h2oModelError1a, results='hide'}
+h2o.init() # Fire up h2o
+# Investigate test error
+error_tbl <- cryptoFeatures %>% 
+    filter(year == 2021) %>%
+    add_column(pred = pred_h2o %>% as_tibble() %>% pull(predict)) %>%
+    rename(actual = adjusted) %>%
+    mutate(
+        error     = actual - pred,
+        error_pct = error / actual
+        ) 
+```
+
+### Let us Predict the Price of $ZIL: Best Model [3]
+```{r h2oModelError1b}
+error_tbl
+```
+
+### Let us Predict the Price of $ZIL: Best Model [4]
+
+```{r h2oModelError2}
+error_tbl %>% summarise(me = mean(error),
+                        rmse = mean(error^2)^0.5,
+                        mae  = mean(abs(error)),
+                        mape = 100*mean(abs(error_pct)) ) %>%
+  glimpse()
+```
+
+
+### Let us Predict the Price of $ZIL: Comparison with Naive Forecast
+```{r naiveModel}
+library(fpp2)
+naive = data.frame(year = cryptoFeatures$year,
+                   adjusted = cryptoFeatures$adjusted,
+                   naiveFC = cryptoFeatures$adjusted %>% lag)
+naiveResults = naive %>% filter(year == 2021) 
+forecast::accuracy(object = naiveResults$naiveFC, x = naiveResults$adjusted)
+```
+
+
+# Recap
+
+### Today's Learning Objectives
+\begin{block}{\textbf{Main Learning Outcomes}}
+  \begin{itemize}
+      \item \textbf{Examine the Use of autoML for TS Prediction.}
+	\end{itemize}
+\end{block}
+
+
+### References {.allowframebreaks}
+::: {#refs}
+:::
+
+
+---
+
+\maketitle
