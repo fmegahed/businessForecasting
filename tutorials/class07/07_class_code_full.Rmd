@@ -1,0 +1,245 @@
+---
+title: "ISA 444: Business Forecasting"
+subtitle: "07 - Non-Seasonal Smoothing"
+author: Fadel M. Megahed
+date: "February 15, 2021"
+runtime: shiny
+output: 
+  html_document:
+    toc: TRUE
+    toc_float: TRUE
+    number_sections: TRUE
+    theme: spacelab
+    paged_df: TRUE
+    code_folding: show
+    code_download: TRUE
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE,
+                      cache = FALSE,
+                      progress = FALSE, 
+                      verbose = FALSE,
+                      dpi = 600,
+                      dev = 'png',
+                      out.width = '100%')
+```
+
+# Required Packages
+In this section, we will include all the packages used in our analysis. In class, we will add to the packages listed in this template document. As we have done throughout the semester, we will use the [pacman package](https://cran.r-project.org/web/packages/pacman/pacman.pdf) to load (and install if needed) any of the packages. For students who continue to have issues with package installation, I would suggest:  
+
+  - Use R on the FSB virtual Desktop  
+  - Try installing the packages with the [pak package](https://github.com/r-lib/pak), which will consist of the following steps:  
+    - Step 1: Install the pak package, which can be done using either `pacman::p_load(pax)` or `install.packages('pak')`.  
+    - Step 2: Use the `pak::pkg_install("usethis") # package name of interest in quotes` to install the package that you need.  
+    - Step 3: Once you installed all the packages, you can use `pacman::p_load()` to load them
+
+```{r packages}
+if(require(pacman) == FALSE) install.packages('pacman') # check and install pacman if needed
+pacman::p_load(tidyverse, # load the tidyverse package for ggplot2 and dplyr functions
+               plotly, # for creating interactive figures
+               scales, # we sometimes use this for pretty_breaks() or the commas() with ggplot2
+               magrittr, # for pipe based operators
+               lubridate, # we use this to fix dates,
+               fpp2, # for measures of forecast accuracy
+               tidyquant, # we use tidyquant to get stocks and economic data
+               xtable) #to print the results nicely in the chunk titled bestSmoother1
+
+# if you cannot install tidyquant, you should remove it from line 46, remove the comma in line 45 and
+# ensure that the # comment is after the )
+if(require(tidyquant)==FALSE) source('https://raw.githubusercontent.com/fmegahed/businessForecasting/master/custom_functions/tq_get.R')
+
+```
+
+---
+
+# A Quick Tour of the Two Plots from Last Class
+
+## Smoothing with the Overall Average
+
+If you have a series that stays pretty constant over time, you could just use the overall average for smoothing/forecasting. In R, we can use the `meanf()` from [fpp2](https://cran.r-project.org/web/packages/fpp2/index.html) to smooth and forecast using the overall mean. In this example, we will build on the code below to recreate the plot shown in [Slide 11 of Class 07 Notes](https://miamioh.instructure.com/courses/142177/files/19157661?module_item_id=2920035).
+
+```{r overallAvg}
+usdt = tq_get('USDT-USD', from = Sys.Date()-90, to = Sys.Date() - 1) %>% select(date, adjusted) 
+
+# Custom function that will be used in "hacking" the x-axis tick labels
+properDates = function(x) {format(lubridate::date_decimal(x), "%b %d, %Y")}
+
+# Our first step is to create a time series from the data frame
+usdt_ts = ts(usdt$adjusted, 
+             start = c(2020, yday(usdt$date[1])),
+             frequency = 365) #from base R
+
+meanF = meanf(usdt_ts, h = 5, level = 95) # from the fpp2 package --> overall forecast
+names(meanF)
+meanF$mean # our forecast for the future
+meanF$fitted # smoothed values for the original data
+meanF$x # original data
+meanF$lower # lower values for our 95%PI (if you wanted a diff interval change the value for level)
+
+autoplot(meanF) +
+  autolayer(fitted(meanF), series = 'Overall Mean') +
+  scale_x_continuous(labels = properDates)
+```
+
+
+## Forecasting Using Cumulative Avg, MA3 and MA7
+Based on our [Class 06 Example](https://miamioh.instructure.com/courses/142177/files/19101870?fd_cookie_set=1), we have compared the predictive performance of the cumulative average, MA3, and MA7 on the usdt dataset. For your convenience, I am including our code from last class below. Based on the code/results, let us recreate the chart depicted in [Slide 13 of Class 07 Notes](https://miamioh.instructure.com/courses/142177/files/19157661?module_item_id=2920035).
+
+```{r bestSmoother1, results='asis'}
+usdt = tq_get('USDT-USD', from = '2020-11-16', to = '2021-02-14') %>%
+  select(date, adjusted)
+
+usdt_comp = usdt %>% 
+  mutate(cAVG = cummean(adjusted), # fn from dplyr
+         ma3 = rollmeanr(adjusted, k = 3, na.pad = TRUE), # fn from zoo/tidyquant
+         ma7 = rollmeanr(adjusted, k =7, na.pad = TRUE), # fn from zoo/tidyquant
+         fcAVG = lag(cAVG), 
+         fma3 = lag(ma3), 
+         fma7 = lag(ma7))
+
+results = rbind(accuracy(object = usdt_comp$fcAVG, x = usdt_comp$adjusted), # forecast metrics for cumulative AVG
+                accuracy(object = usdt_comp$fma3, x = usdt_comp$adjusted),
+                accuracy(object = usdt_comp$fma7, x = usdt_comp$adjusted) )
+
+rownames(results) = c('Cumulative Average', 'MA3', 'MA7')
+
+# nice formatting of the results (needs results = 'asis' in code chunk)
+knitr::kable(results, digits = c( rep(6, 5)) )
+```
+
+Based on the results above and the MAPE metric, we will pick the `r names( which.min(results[, 'MAPE']) ) `.
+
+```{r bestSmoother2}
+# Step 1: add columns for FC (best Forecast), lower and upper to usdt_comp
+
+# Step 2: Store/Compute the RMSE for the best Model
+
+# Step 3: Create a usdtFuture Data Frame containing dates, adjusted, FC, lower and upper
+
+# Step 4: Row binding the original data with the usdtFuture (Ensure that they have equal columns)
+
+# Step 5: Plot the data
+```
+
+
+---
+
+# Simple Exponential Smoothing
+
+## Impact of the Smoothing Parameter: Visually
+
+In the code chunk below, I provide you with an interactive code that allows you to assess the impact of different values of $\alpha$ on the weights for each lag. **I encourage you to play with the values of $\alpha$ to aid your understanding/intuition of how the SES smoother works.** 
+
+```{r alpha, echo=FALSE}
+numericInput("alpha", label = "Alpha Value for the Plot",
+             min = 0.05, max = 0.95, step = 0.05,
+             value = 0.2)
+
+df2 <- data.frame(t= seq(9, 0, -1), alpha = rep(NA, 10))
+
+renderPlot({
+  for (i in 1:nrow(df2)) {
+    df2$alpha[i] <- input$alpha*(1 - input$alpha)^(i-1)
+  }
+  df2$lag = rev(df2$t) + 1 
+  df2 %<>% pivot_longer(c(2))
+
+df2 %>% ggplot(aes(x = as.integer(lag), y = value, group = name, color = name)) +
+  geom_line() + geom_point() + theme_bw() +
+  labs(x = 'Lag', y = 'Weight', title = 'Effect of Weights on Different Lags in SES', color = 'Smoothing Parameter') +
+  theme(legend.position = 'none') +
+  scale_x_continuous(breaks = scales::pretty_breaks()) +
+  scale_color_brewer(type = "qual", palette = 'Dark2') +
+  scale_y_continuous(limits = c(0,1))
+})
+```
+
+
+## SES for New One Family Houses Sold
+
+In the example below, I have read the HSN1F macroeconomic variable from [FRED](https://fred.stlouisfed.org/series/HSN1F) between 2016-01-01 and 2020-12-01. If you were to select $\alpha = 0.2$ and initialize $l_0 = 774$, please fill the last three columns in the table (by performing “manual computations”).
+
+```{r sesHousingSold}
+hsn1f = read.csv("https://fred.stlouisfed.org/graph/fredgraph.csv?bgcolor=%23e1e9f0&chart_type=line&drp=0&fo=open%20sans&graph_bgcolor=%23ffffff&height=450&mode=fred&recession_bars=on&txtcolor=%23444444&ts=12&tts=12&width=1168&nt=0&thu=0&trc=0&show_legend=yes&show_axis_titles=yes&show_tooltip=yes&id=HSN1F&scale=left&cosd=2016-01-01&coed=2020-12-01&line_color=%234572a7&link_values=false&line_style=solid&mark_type=none&mw=3&lw=2&ost=-99999&oet=99999&mma=0&fml=a&fq=Monthly&fam=avg&fgst=lin&fgsnd=2020-02-01&line_index=1&transformation=lin&vintage_date=2021-02-14&revision_date=2021-02-14&nd=1963-01-01")
+
+ses0.2 = ses(y = hsn1f$HSN1F, h = 12, level = 95, initial = 'simple', alpha = 0.2)
+ses0.8 = ses(y = hsn1f$HSN1F, h = 12, level = 95, initial = 'simple', alpha = 0.8)
+
+accuracy(ses0.2) # this works because you are using an object from the forecast package
+accuracy(object = ses0.2$fitted, x = hsn1f$HSN1F)
+accuracy(ses0.8)
+
+autoplot(ses0.8) + autolayer(fitted(ses0.8))
+
+# Approach two: just to print the year on the x-axis (this is why we defined the ts)
+hsn1f_ts = ts(hsn1f$HSN1F, start = c(2016, 1), frequency = 12)
+hsn1f_ts
+ses0.8TS = ses(y = hsn1f_ts, h = 12, level = 95, initial = 'simple', alpha = 0.8)
+
+autoplot(ses0.8TS)
+```
+
+
+## SES For Hypothetical Book Example
+
+### Difference to Book Results
+In this example, we are using R to forecast sales mimicking Table 3.3 in our textbook. See P. 72. <span style="color: red;">Note the difference between the generated output here and that in the Table. If you wanted to exactly replicate that result, what minor edit to the R forecast is needed?</span>
+
+```{r hypotheticalBookExample}
+df = data.frame(time = 1:12, sales = c(5, 6, 7, 8, 7, 6, 5, 6, 7, 8, 7, 6) )
+
+df %>% 
+  ggplot(aes(x= time, y = sales)) + # setting the canvas
+  geom_line() + geom_point() + # lines with dots highlighted
+  scale_x_continuous(breaks = pretty_breaks(12)) + # making x_axis pretty (from scales)
+  theme_bw() # using our typical black and white theme
+
+
+sales_ts = ts(df$sales, start = 1, frequency = 1)
+sesRes = ses(sales_ts, initial = "simple", alpha = 0.3, h =3, level = 95)
+accuracy(sesRes)
+accuracy(object = sesRes$fitted[2:12], # forecast
+         x = df$sales[2:12]) # x is the real data
+```
+
+### Charting the Data, SES & Forecast {.tabset .tabset-fade .tabset-pills}
+
+#### SES Only {-}
+```{r hypotheticalBookExampleChart1}
+autoplot(sesRes) + autolayer(fitted(sesRes)) + theme_bw()
+```
+
+#### SES, Overall AVG and Naive {-}
+```{r hypotheticalBookExampleChart2}
+sesRes = ses(sales_ts, initial = "simple", alpha = 0.3, h =3, level = 95)
+naiveFC = naive(sales_ts, h = 3, level = 95)
+overallMean = meanf(sales_ts, h =3, level = 95)
+
+autoplot(sesRes) + 
+  autolayer(fitted(sesRes), series = 'Simple ES') +
+  autolayer(fitted(naiveFC), series = 'Naive Fit') +
+  autolayer(fitted(overallMean), series = 'Overall Mean') + theme_bw()
+```
+
+
+## Optimizing the Smoothing Parameter
+
+<span style="color: red;">This will be discussed next class. It will not be on the Exam!!</span>
+
+To illustrate the aforementioned concepts, let us examine the data for the [WFJ Sales Example](https://github.com/fmegahed/businessForecasting/blob/master/assignments/WFJ_sales.xlsx?raw=true) (i.e., Example 3.2 in our textbook). Per the textbook example, we will use the first the 26 observations as the estimation sample.
+
+```{r wfjSales}
+pacman::p_load(readxl)
+download.file("https://github.com/fmegahed/businessForecasting/blob/master/assignments/WFJ_sales.xlsx?raw=true",
+              destfile = "WFJ_sales.xlsx", mode = "wb")
+WFJ = read_excel("WFJ_sales.xlsx") %>% select(c(1,2))
+
+
+```
+
+
+
+---

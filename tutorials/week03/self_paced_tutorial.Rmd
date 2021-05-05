@@ -1,0 +1,241 @@
+---
+title: "ISA 444: Business Forecasting"
+subtitle: "A Self-Paced Review for Week 03"
+author: Fadel M. Megahed
+date: 'Spring 2021'
+theme: simplex
+output:
+  learnr::tutorial:
+    progressive: true
+    allow_skip: true
+runtime: shiny_prerendered
+always_allow_html: yes
+bibliography: refs.bib
+link-citations: yes
+description: >
+  Demonstrate your knowledge of the materials covered in class so far. This tutorial is meant to supplement the in-class lectures, graded/non-graded assignments, and everything we have done in class so far. It should also serve as an interactive study guide that can help you evaluate your understanding/knowledge of the material covered so far in class. 
+---
+
+
+## Welcome 
+
+In this tutorial, you will review **some of the introductory statistical tools** that are used for exploring time-series data. Furthermore, I will try to teach you some useful "tricks" in analyzing data as a part of this tutorial. Hence, I will push your knowledge limits and also build upon what you learned so far in the class. This tutorial is optional, but if you plan on completing it, you are advised to do the following prior to attempting the tutorial.   
+
+1. Read chapters 1, 2 and 3.1-3.2 from our textbook.  
+2. Have completed all non-graded and graded assignments on our Canvas site.  
+3. Be able to dedicate about 50-90 minutes to go through this entire tutorial.
+
+
+**For your information, here are all the packages that are loaded with this tutorial.**
+```{r setup, include=TRUE, verbose = FALSE, message=FALSE, warning=FALSE}
+library(tidyverse)
+library(tidyquant)
+library(fpp2)
+library(learnr) # used to convert my R Markdown into a tutorial
+library(magrittr)
+library(timetk)
+library(plotly)
+library(scales)
+tutorial_options(exercise.timelimit = 600) # server sleeps with 10 min of inactivity
+```
+
+
+## Data Exploration
+
+To further help you with some of the concepts discussed in class, let us examine the application of some of the discussed transformation methods to a COVID dataset that I extracted and stored on my GitHub Site (code to extract the data is presented in the next code chunk). The dataset was generated using the excellent [COVID19 package](https://covid19datahub.io/) and was filtered to include the **cumulative** number of confirmed cases for four midwestern states. 
+
+As is customary, this tutorial will first ask you to explore the data. Using the space in the code chunk below to perform any needed explorations to answer the questions below.
+
+```{r exercise1, exercise=TRUE, excercise.eval= TRUE}
+covid = url('https://github.com/fmegahed/businessForecasting/blob/master/tutorials/midwest19.rds?raw=true') %>% readRDS() # reading the data from my GitHub Site
+
+```
+
+```{r isGrouped, echo=FALSE}
+question("By inspecting the covid object above, it is",
+  answer("not a grouped_df object",  message = "This is incorrect. You can check this easily using the is_grouped_df() from the dplyr package (which is loaded for your convenience)"),
+  answer("a grouped_by object", correct = TRUE),
+  allow_retry = TRUE
+)
+```
+
+```{r states, echo=FALSE}
+question("By inspecting the covid object above, it contains confirmed cases for the following states",
+  answer("Illinois, Kentucky, Missouri, and Ohio",  message = "This is incorrect. You can check this easily using table(covid$key_google_mobility)"),
+  answer("Illinois, Indiana, Missouri, and Ohio", message = "This is incorrect. You can check this easily using table(covid$key_google_mobility)"),
+  answer("Illinois, Indiana, Kentucky, and Ohio", message = "This is incorrect. You can check this easily using table(covid$key_google_mobility)"),
+  answer("Illinois, Indiana, Michigan, and Ohio", correct = TRUE),
+  allow_retry = TRUE
+)
+```
+
+```{r population, echo=FALSE}
+question("By inspecting the covid object above, Illinois is the most populous state",
+  answer("TRUE",  correct = TRUE),
+  answer("FALSE", message = 'You can identify the index of the most populus state using which.max(covid$population)'),
+  allow_retry = TRUE
+)
+```
+
+Use the code chunk below to recreate the interactive chart below.
+
+```{r exercise2, exercise=TRUE, excercise.eval= TRUE, fig.width=8}
+covid = url('https://github.com/fmegahed/businessForecasting/blob/master/tutorials/midwest19.rds?raw=true') %>% readRDS() # reading the data from my GitHub Site
+
+
+```
+
+```{r exercise2-hint}
+# Construct the ggplot first and then save it to an object (e.g., plotCumulative)
+# Then use ggplotly(plotCumulative) to generate the required plot
+```
+
+```{r exercise2-solution}
+covid = url('https://github.com/fmegahed/businessForecasting/blob/master/tutorials/midwest19.rds?raw=true') %>% readRDS() # reading the data from my GitHub Site
+
+covid %>% # Data Layer
+  ggplot(aes(x = date, y = confirmed, color = key_google_mobility)) + # Aesthetics for plot layer
+  geom_line() + # Geom layer
+  scale_x_date(breaks = pretty_breaks(6)) + # Increasing the number of printed x_axis ticks
+  scale_y_continuous(labels = comma) + # Adding commas to the y-axis tick labels for ease of readability
+  labs(x = 'Date', y = 'Cumulative Cases', color = 'State') + # fixing labs for axes and legend
+  theme_bw() -> # to use a black and white theme
+  plotCumulative # name of the object that we are saving the plot in 
+
+ggplotly(plotCumulative) # generating the interactive plot using ggplotly from ggplot
+```
+
+```{r chart, echo=FALSE, fig.width=8}
+covid = url('https://github.com/fmegahed/businessForecasting/blob/master/tutorials/midwest19.rds?raw=true') %>% readRDS() # reading the data from my GitHub Site
+
+covid %>% # Data Layer
+  ggplot(aes(x = date, y = confirmed, color = key_google_mobility)) + # Aesthetics for plot layer
+  geom_line() + # Geom layer
+  scale_x_date(breaks = pretty_breaks(6)) + # Increasing the number of printed x_axis ticks
+  scale_y_continuous(labels = comma) + # Adding commas to the y-axis tick labels for ease of readability
+  labs(x = 'Date', y = 'Cumulative Cases', color = 'State') + # fixing labs for axes and legend
+  theme_bw() -> # to use a black and white theme
+  plotCumulative # name of the object that we are saving the plot in 
+
+ggplotly(plotCumulative) # from plotly
+```
+
+
+
+
+## Measures of Forecast Accuracy and Prediction Intervals
+
+In class, we examined several measures of forecast
+
+Build on the code below, to report the ME, MAE, RMSE, MPE, and MAPE for using a **naive forecast** to predict the next day adjusted closing price for MCD. 
+
+```{r mcd, exercise = TRUE, exercise.eval = TRUE}
+# Recall that the tq_get() is from tidyquant
+mcd = tq_get('MCD', from = '2020-10-30', to = '2021-02-10', periodicity = 'daily') %>%
+  select(date, adjusted) # note periodicity allows you to use weekly, monthly, quarterly or yearly periods (it is in the original getSymbols function inputs)
+
+# a neat function from the timetk package to generate quick plots from data frames
+## Did not discuss in class since some MAC users had issues installing timetk
+plot_time_series(mcd, .date_var = date, .value = adjusted, .smooth = FALSE,
+                 .title = "Interactive Plot of Adjusted Closing Price for McDonald's (MCD)")
+```
+
+```{r mcd-solution}
+# Compute the naive forecast
+mcd %<>% mutate(naiveFC = lag(adjusted)) # mutate is from dplyr and lag is from base R
+
+# Capitalize on the accuracy function from the fpp2 package to compute the forecast metrics
+accuracy(object = mcd$naiveFC, x = mcd$adjusted)
+```
+
+Using the results above, what are the 90% upper and lower limits for your predicted adjusted closing on 2021-11-02. Recall that:  
+  - The distribution function for the standard normal: $F_z(z) := Pr(Z \le z) = p$. **Hence $p$ corresponds to the probablity to the left of $z$.**  
+  - The `qnorm()` returns the quantile of the normal distribution, i.e., the minimum value of z from amongst all those values whose $c.d.f$ value exceeds $p$.  
+  - For additional intuition on this, please [see Section 4 of our class 05 interactive tutorial](http://rstudio.fsb.miamioh.edu:3838/megahefm/isa444/exam02/#section-non-seasonal-smoothing-approaches).
+
+```{r mcdPI, exercise = TRUE, exercise.eval = TRUE}
+
+```
+
+```{r mcdPI-solution}
+RMSE = accuracy(object = mcd$naiveFC, x = mcd$adjusted) %>%  .[1, 'RMSE']
+
+# PredictionLimits = LastValueofAdjusted +/- RMSE*Z
+LPL = mcd$adjusted[nrow(mcd)] - (RMSE*qnorm(0.95))
+UPL = mcd$adjusted[nrow(mcd)] + (RMSE*qnorm(0.95))
+```
+
+
+## NonSeasonal Smoothing
+
+- **Cumulative average:** In our discussion in class, we stated that this represents the most basic smoothing approach. If you have a series that stays pretty constant over time, you could just constantly update the mean as you gain more information.  
+  - **Assumptions:**  
+    - Non-seasonal time-series  
+    - Non-trending time-series
+    - *Implicit:* A relatively small number of observations in the time-series since if $n$ is large than the impact of the last observation can be neglected.   
+  - **R Function:** In class, we have combined `mutate()` and `cummean()` (both functions are from the [dplyr package](https://dplyr.tidyverse.org/)) to smooth the time-series.  
+  
+- **Rolling/Moving Average:** To overcome the limitation of the cumulative average, we have introduced the moving average with a window size of $k$. In this approach, the weight of each observation is $\frac{1}{k}$.     
+  - **Assumptions:**  
+    - Non-seasonal time-series  
+    - Non-trending time-series   
+  - **R Function:** In class, we have combined `mutate()` (which creates a new variable from the [dplyr package](https://dplyr.tidyverse.org/)) and  `rollmean()` (from the package [zoo](https://cran.r-project.org/web/packages/zoo/zoo.pdf) which can be either loaded using that package or it also gets loaded with [tidyquant](https://cran.r-project.org/web/packages/tidyquant/tidyquant.pdf)) to smooth the time-series. 
+  
+Based on the introduction above, please examine the `FPCPITOTLZGUSA` series on the [FRED Site](https://fred.stlouisfed.org/series/FPCPITOTLZGUSA) and set the dates to 1992-01-01 to 2019-01-01. Based on the interactive graph on the FRED site, please answer the following questions:
+
+```{r tsplotInterpret3, echo=FALSE}
+question("From the FRED plot, is it reasonable to assume that the data is both non-seasonal and non-trending",
+  answer("TRUE", correct = TRUE),
+  answer("FALSE", message = "The overall average is approximately two throughout and no-seasonal patterns can be identified in yearly data."),
+  allow_retry = FALSE
+)
+```
+
+
+Build on the following code to (a) smooth the time-series using cumulative average and MA(3, right aligned), (b) plot the original data along with the two smoothed series, and (c) select the smoothing approach that results in the best RMSE. 
+
+```{r exercise3, exercise=TRUE, excercise.eval= TRUE}
+inflation = read.csv('https://fred.stlouisfed.org/graph/fredgraph.csv?bgcolor=%23e1e9f0&chart_type=line&drp=0&fo=open%20sans&graph_bgcolor=%23ffffff&height=450&mode=fred&recession_bars=on&txtcolor=%23444444&ts=12&tts=12&width=1168&nt=0&thu=0&trc=0&show_legend=yes&show_axis_titles=yes&show_tooltip=yes&id=FPCPITOTLZGUSA&scale=left&cosd=1992-01-01&coed=2019-01-01&line_color=%234572a7&link_values=false&line_style=solid&mark_type=none&mw=3&lw=2&ost=-99999&oet=99999&mma=0&fml=a&fq=Annual&fam=avg&fgst=lin&fgsnd=2009-06-01&line_index=1&transformation=lin&vintage_date=2020-10-11&revision_date=2020-10-11&nd=1960-01-01')
+
+inflation$DATE %<>%  ymd() # to convert from char to date + ymd() from lubridate and two-way pipe from magrittr
+```
+
+```{r exercise3-solution}
+# Question (a):
+# ------------
+# For the sake of convenience, I originally created all three columns (one for each smoothing operation)
+# using the mutate() fn
+inflation %<>% mutate(ca = cummean(FPCPITOTLZGUSA),
+                      ma3 = rollmeanr(FPCPITOTLZGUSA, k = 3, na.pad = TRUE) )
+
+inflation$DATE %<>%  year() # to extract just the year from the DATE (to make the plot work)
+
+# Question (b): (One possible solution)
+# -------------------------------------
+colors = c('FPCPITOTLZGUSA' = 'black',
+           'ca' = 'forestgreen',
+           'ma3' = 'red') # needed to print color names in the legend
+# see https://community.rstudio.com/t/adding-manual-legend-to-ggplot2/41651/4 for more details
+
+inflation %>% ggplot(aes(x = DATE)) +
+  geom_line(aes(y = FPCPITOTLZGUSA, color = 'FPCPITOTLZGUSA')) +
+  geom_line(aes(y = ca, color = 'ca')) +
+  geom_line(aes(y = ma3, color = 'ma3')) +
+  scale_x_continuous(breaks = scales::pretty_breaks(n=20)) +
+  theme_bw() +
+  theme(legend.position = "bottom") + labs(color = 'Time-Series')
+
+
+
+# Question (c):
+# ------------
+# Accuracy is from the fpp2 package -- note that it takes the model as the object and the true as the x-value
+# By specifying both you are assured that you will not compute the ME, MPE, and MAPE incorrectly
+metrics = rbind(accuracy(object = inflation$ca, x = inflation$FPCPITOTLZGUSA),
+                accuracy(object = inflation$ma3, x = inflation$FPCPITOTLZGUSA) )
+row.names(metrics) = c('Cumulative Average', 'Moving Average')
+
+which.min(metrics[, 'RMSE']) # finding minimum along the RMSE column
+```
+
+**Note:** If you are not applying the `accuracy()` from the [forecast package](https://cran.r-project.org/web/packages/forecast/forecast.pdf) directly on a model, I recommend setting the arguments `x` to your true values and `object` to the forecasted value. This will ensure that ME, MPE and MAPE are computed correctly. 

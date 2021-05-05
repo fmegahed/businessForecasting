@@ -1,0 +1,250 @@
+---
+title: "Class 28: Communicating Via Flexdashboards"
+output:
+  flexdashboard::flex_dashboard:
+    orientation: rows
+runtime: shiny
+---
+
+```{r setup, include = FALSE}
+pacman::p_load(tidyverse, tidyquant, magrittr, fpp2, plotly, dygraphs, 
+               DT, imputeTS, fontawesome, flexdashboard, shiny)
+
+# Currency formating based on https://stackoverflow.com/a/56939122/10156153
+mycurrency <- function(x){
+  return(paste("$", formatC(as.numeric(x), format="f", digits=2, big.mark=",")))
+}
+
+imageURL = 'https://pbs.twimg.com/profile_images/422580700290613248/HDNDEppR_400x400.png'
+```
+  
+```{r global, include=FALSE, cache=TRUE, cache.extra = Sys.Date()}
+tickers = c('AAPL', 'CSCO', 'DAL', 'GOLD', 'JNJ', 'IQV', 'MCD', 'PYPL', 'TMUS', 'DHR', 'MDT',
+           'UNH', 'TSLA', 'F', 'AMZN', 'WMT', 'NFLX', 'GOOG', 'TWTR', 'SBUX', 'HD', 'PG',
+           'DS', 'CI', 'MDLZ')
+```
+
+# Column {.sidebar}
+
+**Global Choices:**
+
+```{r globalChoices}
+selectInput("periodicity", label = "Unit of Analysis:",
+            choices = c("daily", "weekly", "monthly"), selected = "monthly")
+
+selectInput(inputId = "tickers", label = "Stock Tickers: (Multiple)", 
+               choices = c('AAPL', 'CSCO', 'DAL', 'GOLD', 'JNJ', 'IQV', 'MCD', 'PYPL', 'TMUS', 'DHR', 'MDT',
+           'UNH', 'TSLA', 'FB', 'AMZN', 'WMT', 'NFLX', 'GOOG', 'TWTR', 'SBUX', 'HD', 'PG',
+           'DS', 'CI', 'MDLZ'), 
+           selected = c("FB", "AAPL", "AMZN", "NFLX"), multiple = TRUE) ## and switch multiple to True
+
+numericInput(inputId = "panels", label = "Select Number of Columns for Plot", 
+             min = 1, max = 4, step = 1, value = 2) ## and switch multiple to True
+```
+
+
+---
+
+<br> <br><br><br><br>
+
+**Filters for Candle Chart:**
+```{r filterCandleChart}
+dateInput("date1", "Starting Date:", value = "2016-01-01")
+dateInput("date2", "Ending Date:", value = Sys.Date()-1)
+```
+
+
+---
+
+<br> <br><br><br> <br>
+
+
+**Created By:** Fadel Megahed
+
+**Version:** 0.1.0
+
+**Last Updated:** `r Sys.Date() %>% format("%b %d, %Y")`
+
+---
+
+**Contact Information:**
+
+`r fa("twitter", fill = "steelblue")` $~$  [\@FadelMegahed](https://twitter.com/FadelMegahed)
+
+`r fa("linkedin", fill = "steelblue")` $~$  [Fadel Megahed](https://www.linkedin.com/in/fadel-megahed-289046b4/)
+
+![](`r imageURL`){width=200px}
+
+
+# Getting the Data
+
+## Column
+
+### Extracting the Data
+
+```{r rawData}
+stocks = reactive({
+  tq_get(x = input$tickers, from = '2010-01-01', to = Sys.Date() - 1, periodicity = input$periodicity)
+})
+
+DT::renderDataTable(
+  datatable(
+    stocks() %>% select(symbol, date, adjusted, volume), 
+    filter = 'top',
+    extensions = c('Buttons'), 
+    options = list(
+      dom = 'Bfrtip',
+      buttons = c('copy', 'csv', 'excel', 'pdf', 'print'),
+      pageLength = 25,
+      rownames = F,
+      digits = c(0, 0, 0, 2, 0)
+    ) 
+  ) %>% 
+    formatCurrency('adjusted') %>% formatCurrency('volume', '', digits = 0)
+)
+```
+
+
+
+# Visualizations
+
+## Row
+
+### Plotting the Adjusted Closing Prices
+```{r tsGraph}
+renderPlotly({
+  p1 = stocks() %>% 
+    ggplot(aes(x = date, y = adjusted, group = symbol, color = symbol, 
+               text = paste('Symbol:', symbol,
+                            '<br>Date:', as.Date(date),
+                            '<br>Adjusted:', mycurrency(adjusted) ) 
+               )
+           ) +
+    geom_line(size = 1.5) + theme_bw(base_size = 18) +
+    scale_x_date(breaks = scales::pretty_breaks(n= 6)) +
+    scale_color_viridis_d() + 
+    scale_y_continuous(labels = scales::dollar_format()) +
+    facet_wrap(~ symbol, ncol = input$panels, scales = "free_y") +
+    labs(x = '') +
+    theme(legend.position = "none")
+  
+  ggplotly(p1, tooltip = c("text")) 
+})
+```
+
+## Row
+
+### Panel Candlestick Plot (Static)
+  
+```{r tsCandleStick}
+dateInput("date1a", "Starting Date:", value = "2016-01-01")
+dateInput("date2a", "Ending Date:", value = Sys.Date()-1)
+renderPlot({
+  stocks() %>% 
+    filter(date >= input$date1 & date <= input$date2 +1) %>% 
+    ggplot(aes(x = date, y = close, group = symbol)) +
+    geom_candlestick(aes(open = open, high = high, low = low, close = close), size = 3, 
+                     fill_up = 'darkgreen', colour_up = 'darkgreen') +
+    labs(y = "Closing Price", x = "") +
+    theme_bw(base_size = 18) +
+    scale_x_date(breaks = scales::pretty_breaks(n= 6)) +
+    scale_y_continuous(labels = scales::dollar_format()) +
+    facet_wrap(~ symbol, ncol = input$panels, scales = "free_y")
+})
+```
+
+
+# Forecasting
+
+For the purpose of class time, we will only deploy a naive forecast. **Obviously, you can try to include some of the more advanced models discussed in class. Perhaps, include them as a choice for the user to pick which model to run.**
+
+## Row
+
+### Naive Predictions
+
+```{r naiveFC}
+df =reactive({ 
+  temp = stocks()
+  temp %<>% group_by(symbol) 
+  temp %<>% mutate(naiveFC = lag(adjusted)) 
+})
+
+DT::renderDataTable(
+  datatable(
+    df() %>% select(symbol, date, adjusted, naiveFC), 
+    filter = 'top',
+    extensions = c('Buttons'), 
+    options = list(
+      dom = 'Bfrtip',
+      buttons = c('copy', 'csv', 'excel', 'pdf', 'print'),
+      pageLength = 10,
+      rownames = F,
+      digits = c(0, 0, 0, 2, 2)
+    ) 
+  ) %>% 
+    formatCurrency(c('adjusted', 'naiveFC') )
+)
+
+```
+
+## Row
+
+### Actual vs Fitted
+
+```{r actualFitted}
+renderPlotly({
+  p3 = df() %>% 
+    ggplot(aes(x = date, group = symbol, color = symbol, 
+               text = paste('Symbol:', symbol,
+                            '<br>Date:', as.Date(date),
+                            '<br>Adjusted:', mycurrency(adjusted),
+                            '<br>Fitted:', mycurrency(naiveFC)) 
+               )
+           ) +
+    geom_line(aes(y = adjusted, color = 'adjusted'), size = 1) + 
+    geom_line(aes(y = naiveFC, color = 'naiveFC'), size = 1) +
+    theme_bw(base_size = 12) +
+    scale_x_date(breaks = scales::pretty_breaks(n= 6)) +
+    scale_color_manual(values = c('adjusted' = 'black', 'naiveFC' = 'gray')) + 
+    scale_y_continuous(labels = scales::dollar_format()) +
+    facet_wrap(~ symbol, ncol = input$panels, scales = "free_y") +
+    theme(legend.position = "top")
+  
+  ggplotly(p3, tooltip = c("text")) 
+})
+
+```
+
+### Forecast Accuracy Summary
+
+Below, we print the error metrics for the `naive forecast`.
+
+```{r naiveFCAccuracy}
+acc = reactive({
+  temp = df() %>% group_by(symbol)
+  
+  temp %<>% mutate(error = adjusted - naiveFC,
+                   SE = error^2, 
+                   AE = abs(error), 
+                   PE = 100*error/adjusted,
+                   APE = abs(PE))
+  
+  accMetrics = temp %>% 
+    summarise(ME = mean(error, na.rm = T),
+              RMSE = sqrt(mean(SE, na.rm = T)),
+              MAE = mean(AE, na.rm = T),
+              MPE = mean(PE, na.rm = T),
+              MAPE = mean(APE, na.rm = T)
+              )
+  
+  accMetrics %>%  mutate_if(is.numeric, round, digits = 2) 
+})
+
+renderDataTable(
+  datatable(
+    acc(),
+    options = list(rownames = F)
+    )
+)
+
+```

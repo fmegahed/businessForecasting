@@ -1,0 +1,85 @@
+---
+title: "ISA 444: Business Forecasting"
+subtitle: "A Self-Paced Review for Weeks 07-08"
+author: Fadel M. Megahed
+date: 'Spring 2021'
+theme: simplex
+output:
+  learnr::tutorial:
+    progressive: true
+    allow_skip: true
+runtime: shiny_prerendered
+always_allow_html: yes
+bibliography: refs.bib
+link-citations: yes
+description: >
+  Demonstrate your knowledge of the materials covered in class so far. This tutorial is meant to supplement the in-class lectures, graded/non-graded assignments, and everything we have done in class so far. It should also serve as an interactive study guide that can help you evaluate your understanding/knowledge of the material covered so far in class. 
+---
+
+
+## Welcome 
+
+In this tutorial, you will review the concepts of **autocorrelation** and **stationarity**. This tutorial is optional, but if you plan on completing it, you are advised to do the following prior to attempting the tutorial.   
+
+1. Thoroughly went through the slides and WebEx videos for classes 12, 13, and 14.  
+2. Read chapters 1, 2, 3.1-3.4, 4 (with the exception of chapter 4.5), and 6.1-6.5 from our textbook.  
+3. Be able to dedicate about 30 minutes to go through this entire tutorial.
+
+
+**For your information, here are all the packages that are loaded with this tutorial.**
+```{r setup, include=TRUE, verbose = FALSE, message=FALSE, warning=FALSE}
+library(learnr) # used to convert my R Markdown into a tutorial
+library(tidyverse)
+library(tidyquant)
+library(fpp2)
+library(magrittr)
+library(timetk)
+library(plotly)
+library(scales)
+library(tseries)
+tutorial_options(exercise.timelimit = 600) # server sleeps with 10 min of inactivity
+```
+
+## Autocorrelation & Stationarity
+
+In class, we have discussed the use of autocorrelation (`acf()` from base R -- i.e., no packages are required) and partial autocorrelation functions (`pacf()` from base R -- i.e., no packages are required) to determine the **type of models** that can be used when modeling different time-series. Below, I provide an overview of what to look for when visualizing each of the `acf()` and `pacf()` functions.   
+
+  - *Does the `acf() %>% autoplot()` die-down or cut-off?* If the acf cuts-off (i.e., it is quickly indicating that as the lags increase, they 'quickly' become not significant), then the time-series being investigated is likely to be stationary. You can/should confirm your insights by running either the `kpss.test()` or the `adf.test()` from the [forecast](https://cran.r-project.org/web/packages/tseries/tseries.pdf) package.
+  - *Does the `acf() %>% autoplot()` seem to be geometrically decreasing in magnitude?* If the answer is yes (i.e., the series has an exponential/sinsoidual pattern) and the `pacf() %>% autoplot()` has only lag(1) to be statistically significant (i.e. autocorrelation statistically different than 0)? Then, we have some evidence that an AR(1) may be appropriate to model the time-series.  
+  - *Do we have evidence of an MA(n) process?* The acf() is only significant for $n$ lags and it cuts off for the rest of the time-series.
+
+```{r acf, fig.keep='hold', out.width='50%', warning='FALSE', echo=FALSE}
+set.seed(2020)
+sim1 = arima.sim(model=list(ma=c(.25, .25, .5)),n=10000)
+ts.plot(sim1)
+acf(sim1, lag.max = 12)
+```
+  
+```{r interpretTS1, echo=FALSE}
+question("From the two plots above, what conclusions can you make? [Select all that apply]",
+  answer("We have a non-stationary time-series", message = 'The mean seems to be around 0 and the acf cuts off at lag(3) '),
+  answer('We have a stationary time-series', correct = TRUE),
+  answer("We can model the series using an MA(3) process", correct = TRUE),
+  answer('We can model the series using an MA(4) process', message = 'Note that this plot starts at lag(0) and lag(4) is not statistically different from zero'),
+  allow_retry = FALSE
+)
+```
+
+### Statistical Test for Stationarity
+
+Confirm your findings about whether the time-series is stationary or not by building on the code chunk below. 
+```{r exercise7, exercise=TRUE, excercise.eval= TRUE}
+set.seed(2020)
+sim1 = arima.sim(model=list(ma=c(.25, .25, .5)),n=10000)
+```
+
+
+```{r exercise7-solution}
+set.seed(2020)
+sim1 = arima.sim(model=list(ma=c(.25, .25, .5)),n=10000)
+
+# You can confirm your findings 
+adf.test(sim1) # we will reject the null hypothesis of non-stationarity
+kpss.test(sim1) # we will not reject the null hypothesis of stationarity
+``` 
+  

@@ -1,0 +1,118 @@
+---
+title: "ISA 444: Business Forecasting"
+subtitle: "A Self-Paced Review for Week 01"
+author: Fadel M. Megahed
+date: 'Spring 2021'
+theme: simplex
+output:
+  learnr::tutorial:
+    progressive: true
+    allow_skip: true
+runtime: shiny_prerendered
+always_allow_html: yes
+bibliography: refs.bib
+link-citations: yes
+description: >
+  Demonstrate your knowledge of the materials covered in class so far. This tutorial is meant to supplement the in-class lectures, graded/non-graded assignments, and everything we have done in class so far. It should also serve as an interactive study guide that can help you evaluate your understanding/knowledge of the material covered so far in class. 
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(tidyquant)
+library(fpp2)
+library(learnr)
+library(ggfortify)
+library(magrittr)
+library(Tmisc)
+tutorial_options(exercise.timelimit = 180)
+```
+
+## Welcome 
+
+In this self-paced guide, you will review: (a) forecasting and time-series data definitions, and (b) the use of R to extract data (through both the `read.csv()` and `tq_get()` functions). This review is optional, but if you plan on completing it, you are advised to do the following prior to attempting the tutorial.   
+
+1. Read Chapter 01 from our textbook.  
+2. Have completed the [in-class examples in the lecture notes for Week 01](https://miamioh.instructure.com/courses/142177/modules).  
+3. Be able to dedicate about 20-40 minutes to go through this entire tutorial.
+
+**Please close this tab after completing the tutorial to reduce the useage on our FSB server.**
+
+
+## Review
+
+Based on [our textbook](https://www.wessexlearning.org/pobf2e/index.html), a **forecast** *is a prediction or estimate of an actual outcome expected in a future time period or for another situation.*   
+  - *The purpose of forecasting is to inform the process of planning.*  
+  - *The purpose of planning is to develop a course of action so that things don't “just continue” based on a no-change forecast.*
+
+
+One of the important concepts from Week 01 was to distinguish between the terms: (a) cross-sectional data, (b) time-series data, and (c) panel data. Let us examine your understanding of these three terms.
+
+```{r cross-sectional, echo=FALSE}
+question("Based on the concepts learned in class, you would classify the Fantasy Football Projections for QBs at: https://www.fantasypros.com/nfl/projections/qb.php as",
+  answer("Cross-sectional data",  correct = TRUE),
+  answer("Time-series data", message = "It is not a time series since the data is aggregated for the entire 2020 season."),
+  answer("Panel data", message = "Panel data involves several cross sectional measurements repeated over time. This answer is incorrect since we only have one time period here (the 2020 NFL season in its entirty)"),
+  allow_retry = TRUE
+)
+```
+
+
+In the R chunk below, please read the data from [Grunfeld's Investment Dataset](http://people.stern.nyu.edu/wgreene/Econometrics/grunfeld.csv), store the data in a data.frame titled `grunfeld`, and print the data.frame. **Note that you can use a csv link as an input to the** `read.csv()` (i.e., just copy the link address and input it to the function). 
+```{r exercise1, exercise=TRUE, excercise.eval= TRUE}
+
+```
+
+```{r exercise1-solution}
+grunfeld = read.csv("http://people.stern.nyu.edu/wgreene/Econometrics/grunfeld.csv")
+grunfeld
+```
+
+```{r panel, echo=FALSE}
+question("By inspecting the rows (note the multiple pages) from the printed object above, grunfeld represents",
+  answer("Cross-sectional data",  message = "We do not define this as cross sectional given that the data is collected repeatedly over time."),
+  answer("Time-series data", message = "It captures 10 firms, where their investments (I), real value (F) and stocks' value (C) are provided. Thus, it should be considered as a panel dataset since it combines features of both cross sectional data and time series data."),
+  answer("Panel data", correct = TRUE),
+  allow_retry = TRUE
+)
+```
+
+Please extract the following series `PRENEL01CNQ656N` from FRED into R. This can be done using the [tidyquant package](https://cran.r-project.org/web/packages/tidyquant/tidyquant.pdf):  
+
+  - The first argument in `tq_get()` is the time series of interest.
+  - Using the command `?tq_get()` see how to change the get argument to capture data from FRED.  
+  - You will also need to change the starting date to `1999-01-01`.
+
+After following the above instructions, please recreate the graph below. 
+
+![Total Electricity Production for China](images/elecChina.png)
+```{r exercise2, exercise=TRUE, excercise.eval= TRUE}
+
+
+```
+
+```{r exercise2-hint-1}
+tepc = tq_get('PRENEL01CNQ656N', get = 'economic.data', from = '1999-01-01')
+```
+
+```{r exercise2-hint-2}
+cat("Note that my figure contains two different geometries (points and lines).")
+```
+
+
+```{r exercise2-solution}
+tepc = tq_get('PRENEL01CNQ656N', get = 'economic.data', from = '1999-01-01')
+
+tepc %>% ggplot(aes(x= date, y = price)) +
+  geom_line() + geom_point() +
+  labs(title = "Total electricity production for China", y = "Gigawatt Hours", x = "Date", 
+       caption = "Data from FRED") + theme_bw()
+```
+
+```{r tsplotInterpret, echo=FALSE}
+question("From the graph above, we can describe this dataset as: [Select all that apply]",
+  answer("Seasonal", correct = TRUE),
+  answer("One with increasing trend", correct = TRUE),
+  answer("Cyclical", message = "The trend is consistent so it is seasonal and not cyclical."),
+  allow_retry = TRUE
+)
+```

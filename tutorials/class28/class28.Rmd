@@ -1,0 +1,231 @@
+---
+title: "Communicating your Results to Senior Management"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: rows
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+pacman::p_load(tidyverse, magrittr, tidyquant, # our typical packages
+               plotly, # for interactive visuals
+               shiny, flexdashboard, DT, # for the shiny/flexdashboard functions
+               fontawesome) # for neat looking icons
+
+tickers = c('AAPL', 'AMZN', 'NFLX', 'FB' , 'GOOG', 'TWTR',
+            'F', 'TSLA', 'GE', 'C',
+            'MCD', 'WMT', 
+            'DAL', 'AA')
+```
+
+
+# Sidebar {.sidebar}
+
+**Global Choices:**
+
+```{r globalChoices}
+selectInput(inputId = 'periodicity', label = 'Select Unit of Aggregation',
+            choices = c('daily', 'weekly', 'monthly'),
+            selected = 'monthly')
+
+selectInput(inputId = 'tickers', label = 'Select Multiple Stocks', 
+            choices = tickers, 
+            selected = c('AAPL', 'AMZN', 'FB', 'NFLX'), 
+            multiple = T)
+
+
+```
+
+<br><br>
+
+---
+
+<br><br>
+
+**CandleStick Filter:**
+```{r candlestickFilter}
+dateInput(inputId = 'start', label = 'Starting Date', value = Sys.Date() - months(13))
+
+```
+
+<br><br>
+
+---
+
+<br><br>
+
+**Created by:** Fadel Megahed
+
+**Version:** 0.0.1
+
+**Last Updated:** `r format(Sys.Date(), format = "%b %d, %Y")`
+
+<br><br>
+
+---
+
+<br><br>
+
+**Contact Information:**
+
+`r fa("twitter", fill = "steelblue")` $~$ [\@FadelMegahed](https://twitter.com/FadelMegahed)
+
+`r fa("linkedin", fill = "steelblue")` $~$ [Fadel Megahed](https://www.linkedin.com/in/fadel-megahed-289046b4/)
+
+
+
+
+
+
+# Getting the Data
+
+## Row
+
+### Extracting the Data
+
+```{r rawData}
+stocks = reactive({
+  tq_get(x = input$tickers, from = '2010-01-01', to = Sys.Date() -1, 
+         periodicity = input$periodicity)
+})
+
+
+renderDataTable(
+  datatable(
+    data = stocks() %>% select(symbol, date, adjusted, volume),
+    extensions = 'Buttons', 
+    options = list(
+      dom = 'Bfrtip',
+      buttons = c('copy', 'csv', 'excel', 'pdf', 'print'),
+      pageLength = 20
+    ) 
+  ) %>% formatCurrency('adjusted') %>% formatCurrency('volume', currency = '', digits = 0)
+)
+
+```
+
+
+# Data Visualization
+
+## Row
+
+### Plotly of the TS
+
+```{r timeSeriesPlot}
+renderPlotly({
+  p1 = stocks() %>% 
+    ggplot(aes(x = date, y = adjusted, group = symbol, color = symbol,
+               text = paste('Symbol:', symbol,
+                            '<br>Date:', date, 
+                            '<br>Adjusted', round(adjusted, digits = 2) )
+    ) 
+    ) +
+    geom_line() +
+    scale_x_date(breaks = scales::pretty_breaks(n = 5)) +
+    facet_wrap(~symbol, ncol = 2, scales = 'free_y') + theme_bw() +
+    theme(legend.position = 'none')
+
+ggplotly(p1, tooltip = "text")
+})
+```
+
+## Row
+
+### Candlestick Chart
+```{r candlestick}
+renderPlot({
+  stocks() %>% 
+    filter(date >= input$start) %>% 
+    ggplot(aes(x = date, y = adjusted, group = symbol)) +
+    scale_x_date(breaks = scales::pretty_breaks(n= 12)) +
+    geom_candlestick(aes(open = open, high = high, low = low, close = close), 
+    fill_up = 'darkgreen' , colour_up = 'darkgreen', size = 3) +
+    facet_wrap(~symbol, scales = 'free_y') + theme_bw()
+})
+
+```
+
+
+# Time Series Forecasting
+
+**Note:** We will explore the most simple forecast today to make our lives easier. We will only look at the **naive forecast.** Obviously, you may/should explore other approaches.
+
+## Row
+
+### Naive Forecast
+
+```{r naiveF}
+df = reactive({
+  dfN = stocks() %>% group_by(symbol)
+  dfN %<>% mutate(naiveFC = lag(adjusted)) 
+})
+
+renderDataTable({
+  datatable(
+  df() %>% select(symbol, date, adjusted, naiveFC),
+    extensions = 'Buttons', 
+    options = list(
+      dom = 'Bfrtip',
+      buttons = c('copy', 'csv', 'excel', 'pdf', 'print'),
+      pageLength = 20
+    ) 
+  ) %>% formatCurrency('adjusted') %>% formatCurrency('naiveFC')
+})
+```
+
+
+## Row
+
+### Actual Vs Fitted
+
+```{r actualFitted}
+renderPlotly({
+  p2 = df() %>% 
+    ggplot(aes(x = date, group = symbol, color = symbol,
+               text = paste('Symbol:', symbol,
+                            '<br>Date:', date, 
+                            '<br>Adjusted', round(adjusted, digits = 2) )
+    ) 
+    ) +
+    geom_line(aes(y = adjusted, color = 'adjusted')) +
+    geom_line(aes(y = naiveFC, color = 'nForecast')) +
+    scale_x_date(breaks = scales::pretty_breaks(n = 5)) +
+    scale_color_manual(values = c('adjusted' = 'black', 'nForecast' = 'gray')) +
+    facet_wrap(~symbol, ncol = 2, scales = 'free_y') + theme_bw()
+
+ggplotly(p2, tooltip = "text")
+})
+```
+
+
+### Forecast Accuracy (Per Symbol)
+
+```{r forecastAcc}
+accuracy = reactive({
+  temp = df() %>% 
+    group_by(symbol) # we do not really need this since it was grouped before
+  
+  temp %<>% mutate(error = adjusted - naiveFC,
+                   SE = error^2, 
+                   AE = abs(error),
+                   PE = 100*error/adjusted,
+                   APE = abs(PE))
+  
+  metrics = temp %>% 
+    summarise(ME = mean(error, na.rm = T), 
+              RMSE = mean(SE, na.rm = T) %>% sqrt(),
+              MAE = mean(AE, na.rm = T),
+              MPE = mean(PE, na.rm = T),
+              MAPE = mean(APE, na.rm = T)) %>% 
+    mutate_if(is.numeric, round, digits = 2)
+})
+
+renderDataTable({
+  datatable(
+    accuracy()
+    )
+})
+
+```
